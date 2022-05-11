@@ -3,7 +3,7 @@ import lxml
 import requests
 import os
 
-url = input('Введите ссылку, я скачаю: ')
+url = input('Введите ссылку, я скачаю: ') + "/albums"
 cookie = input('Введите ID сессии. если ничего не введете, то будет использован ID поумолчанию: ')
 if cookie == "":
     cookie = "3:1652185258.5.0.1648736560374:xuPOww:1e.1.2:1|289268854.0.2|3:252139.301484.C4XoCGmjV9uME_z9aku8q5tPKyk"
