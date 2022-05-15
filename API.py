@@ -4,7 +4,10 @@ from yandex_music import Client
 client = Client()
 client.init()
 
-albums_all = []
-albums = client.artistsDirectAlbums(10731)
-for album in albums:
-    print(album['id'], album['title'])
+albums_all = {}
+for n in range(3):
+    albums = client.artistsDirectAlbums(4650, page=n, page_size=150, sort_by='year')
+#    albums_all+=albums
+    print(len(albums))
+#for album in albums_all:
+#    print(album['id'], album['title'])
