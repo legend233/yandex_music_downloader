@@ -1,7 +1,7 @@
 from yandex_music import Client
 import requests
 import os
-from mutagen.easyid3 import EasyID3
+import music_tag
 
 client = Client(token="AQAAAAARPeR2AAG8XvTIsiSdv0Gav_fZ18vGvzE")
 client.init()
@@ -20,6 +20,9 @@ def search_and_download(search:str):
     for album in direkt_albums[0:1]: # проходимся по каждому альбому
         print('id_album: ',album['id'], ' - ', album['title'])
         n_volume = 1
+
+
+
         for disk in client.albumsWithTracks(album_id=album['id'])['volumes']: #проходимся по каждому диску в альбоме
             print('Volume №: ', n_volume)
             n_volume += 1
@@ -46,22 +49,23 @@ def search_and_download(search:str):
 
 
                 '''
-                mp3 = EasyID3(f"{download_path}/{info['artist']}/{info['album']} ({info['album_year']})/Disk {info['volume_number']}/{info['track_position']} - {info['title'].replace('/', '_')}.mp3")
-                mp3['title'] = info['title']
+                mp3 = music_tag.load_file(f"{download_path}/{info['artist']}/{info['album']} ({info['album_year']})/Disk {info['volume_number']}/{info['track_position']} - {info['title'].replace('/', '_')}.mp3")
+                mp3['tracktitle'] = info['title']
                 mp3['album'] = info['album']
-                
-                mp3.tag.title = info['title']
-                mp3.tag.track_num = info['track_position']
-                mp3.tag.genre = info['genre']
-                mp3.tag.album = info['album']
-                mp3.tag = str(info['album_year'])
-                mp3.tag.artist = info['artist']
-                mp3.tag.title.
+                mp3['tracknumber] = info['track_position']
+                mp3['genre'] = info['genre']
+                mp3['year'] = str(info['album_year'])
+                mp3['artist'] = info['artist']
+
+                album_cover_pic = recuest.get(info['album_cover_link'])   #ложим картинку в переменную
+                with open(album_cover_pic.content, 'rb') as img_in:               #ложим картинку в тег "artwork"
+                    mp3['artwork'] = img_in.read()
+
                 mp3.save()
                 print(mp3.get_tags())
                 '''
 
-        with open(f"{download_path}/{info['artist']}/{info['album']} ({info['album_year']})/cover.jpg", 'wb') as f:
+        with open(f"{download_path}/{info['artist']}/{info['album']} ({info['album_year']})/cover.jpg", 'wb') as f: #ToDo перенести и переделать(определение через альбом). картинка должна скачиваться до треков, чтобы была возможность записать картинку в файл
             rec = requests.get('http://' + info['album_cover_link'])
             f.write(rec.content)
 
