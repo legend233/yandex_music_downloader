@@ -23,6 +23,13 @@ def take_you_choise(message):
     if message.text == "Артиста":
         msg = bot.send_message(message.chat.id, 'Напиши название артиста или группы')
         bot.register_next_step_handler(msg, input_data_artist)
+    elif message.text == "Альбом":
+        msg = bot.send_message(message.chat.id, 'Напиши название альбома')
+        bot.register_next_step_handler(msg, input_data_albom)
+    elif message.text == "По ссылке":
+        msg = bot.send_message(message.chat.id, 'Кинь мне ссылку на альбом или артиста с яндекс музыки')
+        bot.register_next_step_handler(msg, input_data_link)
+
 
 def input_data_artist(message):
     artist = send_search_request_and_print_result(message.text)
@@ -35,6 +42,30 @@ def input_data_artist(message):
     artist_result = artist[artist.find('>>>')+3:artist.rfind('<<<')].lower()
     bot.register_next_step_handler(msg, download_from_input_data, artist_result)
 
+def input_data_albom(message):
+    #artist = send_search_request_and_print_result(message.text)
+    #bot.send_message(message.chat.id, artist)
+    #markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
+    #item1 = types.KeyboardButton("Качаем!")
+    #item2 = types.KeyboardButton("Отмена")
+    #markup.add(item1, item2)
+    #msg = bot.send_message(message.chat.id, 'Качаем музыку этого артиста?', reply_markup=markup)
+    #artist_result = artist[artist.find('>>>')+3:artist.rfind('<<<')].lower()
+    #bot.register_next_step_handler(msg, download_from_input_data, artist_result)
+    pass
+
+
+def input_data_link(message):
+    #artist = send_search_request_and_print_result(message.text)
+    #bot.send_message(message.chat.id, artist)
+    #markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
+    #item1 = types.KeyboardButton("Качаем!")
+    #item2 = types.KeyboardButton("Отмена")
+    #markup.add(item1, item2)
+    #msg = bot.send_message(message.chat.id, 'Качаем музыку этого артиста?', reply_markup=markup)
+    #artist_result = artist[artist.find('>>>')+3:artist.rfind('<<<')].lower()
+    #bot.register_next_step_handler(msg, download_from_input_data, artist_result)
+    pass
 
 def download_from_input_data(message, artist_result):
     if message.text == 'Качаем!':

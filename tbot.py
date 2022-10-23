@@ -2,53 +2,86 @@
 # -*- coding: utf-8 -*-
 
 import telebot
-from mainv2 import download_artist, download_album, quantity_albums, quantity_track
-import re
+from API import search_and_download_artist
 from config import telegramm_token
+from telebot import types
 
 bot = telebot.TeleBot(telegramm_token)
 
-print("я работаю. Буду висеть тут пока не остановишь или не крашнусь")
+print("Telegram bot. v0.001")
 
 
-@bot.message_handler(commands=["start"])
+@bot.message_handler(commands=['start'])
+def start_message(message):
+    bot.send_message(message.chat.id, 'Привет, хочешь скачать музыку себе на plex?')
 
-def start(message):
-    bot.send_message(message.chat.id, "Привет! Я могу скачать твою любимую музыку! Выполни команду скачать и Отправь мне ссылку с яндекс музыки.", parse_mode="html")
 
-@bot.message_handler(commands=["d_artist"])
-def download(message):
-    bot.send_message(
-        message.chat.id,
-        "Сейчас мы скачаем всю музыку указанного артиста. отправь мне ссылку на яндекс музыку: ",
-        parse_mode="html")
-    @bot.message_handler()
-    def artist_link(message):
-        download_link = message.text
-        artist_id = re.split('\?|!|,|-|]', download_link.split("artist/")[1])[0]
-        try:
-            bot.send_message(message.chat.id, f"Уже качаю, всего альбомов {len(quantity_albums(artist_id))}", parse_mode="html")
-            download_artist(download_link)
-            bot.send_message(message.chat.id, f"Все альбомы артиста с ID:{artist_id} скачены", parse_mode="html")
-        except:
-            bot.send_message(message.chat.id, f"Что-то пошло не так. В {download_link} не удалось найти artist ID", parse_mode="html")
+@bot.message_handler(commands=['download'])
+def download_command(message):
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
+    item1 = types.KeyboardButton("Артиста")
+    item2 = types.KeyboardButton("Альбом")
+    item3 = types.KeyboardButton('По ссылке')
+    markup.add(item1, item2, item3)
+    msg = bot.send_message(message.chat.id, 'Какую музыку будем качать?', reply_markup=markup)
+    bot.register_next_step_handler(msg, take_you_choise)
 
-@bot.message_handler(commands=["d_album"])
-def download(message):
-    bot.send_message(
-        message.chat.id,
-        "Сейчас мы скачаем все песни из указанного альбома. отправь мне ссылку на яндекс музыку: ",
-        parse_mode="html")
-    @bot.message_handler()
-    def album_link(message):
-        download_link = message.text
-        album_id = re.split('\?|!|,|-|]', download_link.split("album/")[1])[0]
-        try:
-            bot.send_message(message.chat.id, f"Уже качаю, всего песен в альбоме {quantity_track(album_id)}", parse_mode="html")
-            download_album(album_id)
-            bot.send_message(message.chat.id, f"Все песни из указанного альбома с ID:{album_id} скачены", parse_mode="html")
-        except:
-            bot.send_message(message.chat.id, f"Что-то пошло не так. В {download_link} не удалось найти album ID", parse_mode="html")
+
+def take_you_choise(message):
+    if message.text == "Артиста":
+        msg = bot.send_message(message.chat.id, 'Напиши название артиста или группы')
+        bot.register_next_step_handler(msg, input_data_artist)
+    elif message.text == "Альбом":
+        msg = bot.send_message(message.chat.id, 'Напиши название альбома')
+        bot.register_next_step_handler(msg, input_data_albom)
+    elif message.text == "По ссылке":
+        msg = bot.send_message(message.chat.id, 'Кинь мне ссылку на альбом или артиста с яндекс музыки')
+        bot.register_next_step_handler(msg, input_data_link)
+
+
+def input_data_artist(message):
+    artist = send_search_request_and_print_result(message.text)
+    bot.send_message(message.chat.id, artist)
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
+    item1 = types.KeyboardButton("Качаем!")
+    item2 = types.KeyboardButton("Отмена")
+    markup.add(item1, item2)
+    msg = bot.send_message(message.chat.id, 'Качаем музыку этого артиста?', reply_markup=markup)
+    artist_result = artist[artist.find('>>>') + 3:artist.rfind('<<<')].lower()
+    bot.register_next_step_handler(msg, download_from_input_data, artist_result)
+
+
+def input_data_albom(message):
+    # artist = send_search_request_and_print_result(message.text)
+    # bot.send_message(message.chat.id, artist)
+    # markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
+    # item1 = types.KeyboardButton("Качаем!")
+    # item2 = types.KeyboardButton("Отмена")
+    # markup.add(item1, item2)
+    # msg = bot.send_message(message.chat.id, 'Качаем музыку этого артиста?', reply_markup=markup)
+    # artist_result = artist[artist.find('>>>')+3:artist.rfind('<<<')].lower()
+    # bot.register_next_step_handler(msg, download_from_input_data, artist_result)
+    pass
+
+
+def input_data_link(message):
+    # artist = send_search_request_and_print_result(message.text)
+    # bot.send_message(message.chat.id, artist)
+    # markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
+    # item1 = types.KeyboardButton("Качаем!")
+    # item2 = types.KeyboardButton("Отмена")
+    # markup.add(item1, item2)
+    # msg = bot.send_message(message.chat.id, 'Качаем музыку этого артиста?', reply_markup=markup)
+    # artist_result = artist[artist.find('>>>')+3:artist.rfind('<<<')].lower()
+    # bot.register_next_step_handler(msg, download_from_input_data, artist_result)
+    pass
+
+
+def download_from_input_data(message, artist_result):
+    if message.text == 'Качаем!':
+        d_artist = search_and_download_artist(artist_result)
+        bot.send_message(message.chat.id, d_artist)
+
 
 
 bot.polling(none_stop=True)
