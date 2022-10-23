@@ -56,9 +56,9 @@ def search_and_download_artist(search:str):
                 tag_info = client.tracks(track['id'])[0]
                 info = {
                     'title': tag_info['title'],
-                    'volume_number': tag_info['albums'][0]['track_position']['volume'],
+                    'volume_number': track['albums'][0]['track_position']['volume'],
                     'total_volumes': len(volumes),
-                    'track_position': tag_info['albums'][0]['track_position']['index'],
+                    'track_position': track['albums'][0]['track_position']['index'],
                     'total_track': album['track_count'],
                     'genre': tag_info['albums'][0]['genre'],
                     'artist': artist_name,
@@ -243,4 +243,4 @@ def send_search_request_and_print_result(query):
 
 if __name__ == '__main__':
     input_query = input('Введите поисковой запрос: ')
-    search_and_download_album(input_query)
+    search_and_download_artist(input_query)
