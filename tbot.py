@@ -2,9 +2,8 @@
 # -*- coding: utf-8 -*-
 
 import telebot
-from API import search_and_download_artist
-from config import telegramm_token
 from telebot import types
+from API import send_search_request_and_print_result, search_and_download_artist
 
 bot = telebot.TeleBot(telegramm_token)
 
