@@ -94,15 +94,20 @@ def search_and_download_artist(search:str):
                     mp3['comment'] = f"Release date {info['album_year']}"
                 mp3['artist'] = info['artist']
                 mp3['album_artist'] = info['album_artist']
-                full_lyrics = client.trackSupplement(178499)['lyrics']['full_lyrics']
-                mp3['lyrics'] = full_lyrics
+                try:
+                    full_lyrics = client.trackSupplement(track['id'])['lyrics']['full_lyrics']
+                    mp3['lyrics'] = full_lyrics
+                    with open(track_file.replace('.mp3','.txt'), 'w', encoding='UTF8') as lyric:
+                        lyric.write(full_lyrics)
+                except:
+                    print('No lyrics for this track')
+
                 with open(album_cover_pic, 'rb') as img_in:               #ложим картинку в тег "artwork"
                     mp3['artwork'] = img_in.read()
 
                 mp3.save()
 
-                with open(track_file.replace('.mp3','.txt'), 'w', encoding='UTF8') as lyric:
-                    lyric.write(full_lyrics)
+
 
     return f"Успешно скачал артиста: {info['artist']} с его {direkt_albums_count} альбомами. Наслаждайся музыкой на Plex"
 
