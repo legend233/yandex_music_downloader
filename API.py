@@ -1,11 +1,15 @@
+import time
+
 from yandex_music import Client
 import requests
 import os
 import music_tag
-from config import ya_token, download_path
+from config import ya_token, download_path, musixmatch_api
+from musixmatch import Musixmatch
 
 client = Client(token=ya_token)
 client.init()
+musixmatch = Musixmatch(musixmatch_api)
 
 def search_and_download_artist(search:str):
     '''Ищем лучший результат по запросу артиста и скачиваем все его песни в папку download с разбивкой по альбомам'''
@@ -31,7 +35,7 @@ def search_and_download_artist(search:str):
     # находим список альбомов артиста с информацией
     direkt_albums = client.artistsDirectAlbums(artist_id=artist_id)
     # проходимся по каждому альбому
-    for album in direkt_albums:
+    for album in direkt_albums[1:2]:
         print('id_album: ', album['id'], ' - ', album['title'])
 
         #создаем папку для альбома
@@ -94,13 +98,24 @@ def search_and_download_artist(search:str):
                     mp3['comment'] = f"Release date {info['album_year']}"
                 mp3['artist'] = info['artist']
                 mp3['album_artist'] = info['album_artist']
+
                 try:
-                    full_lyrics = client.trackSupplement(track['id'])['lyrics']['full_lyrics']
-                    mp3['lyrics'] = full_lyrics
-                    with open(track_file.replace('.mp3','.txt'), 'w', encoding='UTF8') as lyric:
+                    lyrics = musixmatch.matcher_lyrics_get(info['title'], info['artist'])
+                    full_lyrics = lyrics['message']['body']['lyrics']['lyrics_body'][:-58]
+                    with open(track_file.replace('.mp3', '.txt'), 'w', encoding='UTF8') as lyric:
                         lyric.write(full_lyrics)
+
+                    mp3['lyrics'] = full_lyrics
                 except:
-                    print('No lyrics for this track')
+                    print('With lyrics some problem, I\'m was try again after 10 second')
+                    time.sleep(10)
+                    try:
+                        lyrics = musixmatch.matcher_lyrics_get(info['title'], info['artist'])
+                        full_lyrics = lyrics['message']['body']['lyrics']['lyrics_body'][:-58]
+                        with open(track_file.replace('.mp3', '.txt'), 'w', encoding='UTF8') as lyric:
+                            lyric.write(full_lyrics)
+                    except:
+                        print('Lyrics is missing')
 
                 with open(album_cover_pic, 'rb') as img_in:               #ложим картинку в тег "artwork"
                     mp3['artwork'] = img_in.read()
