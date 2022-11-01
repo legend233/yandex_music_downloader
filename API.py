@@ -33,7 +33,7 @@ def search_and_download_artist(search:str):
     # находим список альбомов артиста с информацией
     direkt_albums = client.artistsDirectAlbums(artist_id=artist_id)
     # проходимся по каждому альбому
-    for album in direkt_albums[1:2]:
+    for album in direkt_albums:
         print('id_album: ', album['id'], ' - ', album['title'])
 
         #создаем папку для альбома
