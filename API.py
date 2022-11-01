@@ -12,10 +12,13 @@ client.init()
 def search_and_download_artist(search:str):
     '''Ищем лучший результат по запросу артиста и скачиваем все его песни в папку download с разбивкой по альбомам'''
 
-    search_result = client.search(search, type_="artist", page=0, nocorrect=False) # поиск
-    artist_id = search_result['artists']['results'][0]['id']
-    artist_name = search_result['artists']['results'][0]['name']
-
+    try:
+        search_result = client.search(search, type_="artist", page=0, nocorrect=False) # поиск
+        artist_id = search_result['artists']['results'][0]['id']
+        artist_name = search_result['artists']['results'][0]['name']
+    except:
+        print('No results! You sure?')
+        return f'Твой запрос: {search} не найден.'
     print('Artist ID: ', artist_id) # вывод ID
     print(artist_name) # вывод названия артиста
     direkt_albums_count = search_result['artists']['results'][0]['counts']['direct_albums']
@@ -31,7 +34,7 @@ def search_and_download_artist(search:str):
         f.write(rec.content)
 
     # находим список альбомов артиста с информацией
-    direkt_albums = client.artistsDirectAlbums(artist_id=artist_id)
+    direkt_albums = client.artistsDirectAlbums(artist_id=artist_id, page_size=1000)
     # проходимся по каждому альбому
     for album in direkt_albums:
         print('id_album: ', album['id'], ' - ', album['title'])
@@ -54,7 +57,8 @@ def search_and_download_artist(search:str):
 
             for track in disk: # проходимся по каждому треку в диске
                 track_info = client.tracks_download_info(track_id=track['id'], get_direct_links=True) # узнаем информацию о треке
-                print('ID: ', track['id'], track['title'],'bitrate:', track_info[1]['bitrate_in_kbps'], 'Download: ', track_info[1]['direct_link'])
+                track_info.sort(reverse=True, key=lambda key: key['bitrate_in_kbps'])
+                print('ID: ', track['id'], track['title'],'bitrate:', track_info[0]['bitrate_in_kbps'], 'Download: ', track_info[0]['direct_link'])
                 tag_info = client.tracks(track['id'])[0]
                 info = {
                     'title': tag_info['title'],
@@ -73,7 +77,7 @@ def search_and_download_artist(search:str):
                 os.makedirs(os.path.dirname(f"{disk_folder}/"), exist_ok=True)
                 track_file = f"{disk_folder}/{info['track_position']} - {info['title'].replace('/', '_')}.mp3"
                 client.request.download(
-                    url=track_info[1]['direct_link'],
+                    url=track_info[0]['direct_link'],
                     filename=track_file
                 )
 
