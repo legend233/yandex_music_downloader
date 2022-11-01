@@ -4,12 +4,10 @@ from yandex_music import Client
 import requests
 import os
 import music_tag
-from config import ya_token, download_path, musixmatch_api
-from musixmatch import Musixmatch
+from config import ya_token, download_path
 
 client = Client(token=ya_token)
 client.init()
-musixmatch = Musixmatch(musixmatch_api)
 
 def search_and_download_artist(search:str):
     '''Ищем лучший результат по запросу артиста и скачиваем все его песни в папку download с разбивкой по альбомам'''
@@ -99,23 +97,14 @@ def search_and_download_artist(search:str):
                 mp3['artist'] = info['artist']
                 mp3['album_artist'] = info['album_artist']
 
-                try:
-                    lyrics = musixmatch.matcher_lyrics_get(info['title'], info['artist'])
-                    full_lyrics = lyrics['message']['body']['lyrics']['lyrics_body'][:-58]
-                    with open(track_file.replace('.mp3', '.txt'), 'w', encoding='UTF8') as lyric:
-                        lyric.write(full_lyrics)
+                lyrics = client.trackSupplement(track['id'])['lyrics']
+                if lyrics:
+                    with open(track_file.replace('.mp3', '.txt'), 'w', encoding='UTF8') as text_song:
+                        text_song.write(lyrics['full_lyrics'])
 
-                    mp3['lyrics'] = full_lyrics
-                except:
-                    print('With lyrics some problem, I\'m was try again after 10 second')
-                    time.sleep(10)
-                    try:
-                        lyrics = musixmatch.matcher_lyrics_get(info['title'], info['artist'])
-                        full_lyrics = lyrics['message']['body']['lyrics']['lyrics_body'][:-58]
-                        with open(track_file.replace('.mp3', '.txt'), 'w', encoding='UTF8') as lyric:
-                            lyric.write(full_lyrics)
-                    except:
-                        print('Lyrics is missing')
+                    mp3['lyrics'] = lyrics['full_lyrics']
+                else:
+                    print('Lyrics is missing')
 
                 with open(album_cover_pic, 'rb') as img_in:               #ложим картинку в тег "artwork"
                     mp3['artwork'] = img_in.read()
