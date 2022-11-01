@@ -66,7 +66,7 @@ def search_and_download_artist(search:str):
                     'artist': artist_name,
                     'album_artist': [artist['name'] for artist in album['artists']],
                     'album': album['title'],
-                    'album_year': album['release_date'][:10],
+                    'album_year': album['year'],
                 }
 
                 disk_folder = f"{album_folder}/Disk {info['volume_number']}"
