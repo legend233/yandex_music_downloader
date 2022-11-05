@@ -1,5 +1,3 @@
-import time
-
 from yandex_music import Client
 import requests
 import os
@@ -72,6 +70,7 @@ def search_and_download_artist(search:str):
                     'album': album['title'],
                     'album_year': album['year'],
                 }
+
 
                 disk_folder = f"{album_folder}/Disk {info['volume_number']}"
                 os.makedirs(os.path.dirname(f"{disk_folder}/"), exist_ok=True)
@@ -261,5 +260,5 @@ def send_search_request_and_print_result(query):
     return ' '.join(text)
 
 if __name__ == '__main__':
-    input_query = input('Введите поисковой запрос: ')
+    input_query = input('Введите поисковой запрос:  ')
     search_and_download_artist(input_query)
