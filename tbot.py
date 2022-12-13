@@ -4,7 +4,7 @@
 import telebot
 from telebot import types
 from API import send_search_request_and_print_result, search_and_download_artist, download_album, get_album_info
-from config import telegramm_token_test
+from config import telegramm_token
 
 bot = telebot.TeleBot(telegramm_token)
 
