@@ -118,99 +118,99 @@ def search_and_download_artist(search:str):
 
     return f"Успешно скачал артиста: {info['artist']} с его {direkt_albums_count} альбомами. Наслаждайся музыкой на Plex"
 
-def search_and_download_album(search:str):
-    '''Ищем лучший результат по запросу альбома и скачиваем все его песни в папку download с разбивкой по альбомам,артисту'''
+def get_album_info(album_id):
+    album = client.albumsWithTracks(album_id=album_id)
+    return f"Скачать альбом '{album['title']}' артиста(ов) \
+        '{', '. join([art['name'] for art in album['artists']])}' \
+            в котором {album['track_count']} треков?"
 
-    search_result = client.search(search, type_="album", page=0, nocorrect=False) # поиск
-    artist_id = search_result['albums']['results'][0]['artists'][0]['id']
-    artist_name = search_result['albums']['results'][0]['artists'][0]['name']
-    album_name = search_result['albums']['results'][0]['title']
-    print(search_result['albums']['results'][0]['artists'])
-    print('Artist ID: ', artist_id) # вывод ID
-    print('Artist: ', artist_name) # вывод названия артиста
-    print('Album: ', album_name)# вывод названия альбом
-'''
-    artist_cover_link = client.artistsBriefInfo(artist_id=artist_id)['artist']['cover']['uri'].replace('%%', '1000x1000')
-    artist_folder = f"{download_path}/{artist_name}"
-    artist_cover_pic = f"{artist_folder}/artist.jpg"
+def download_album(album_id):
 
-    os.makedirs(os.path.dirname(f"{artist_folder}/"),exist_ok=True)
-    with open(artist_cover_pic, 'wb') as f:  # качаем обложку артиста
-        rec = requests.get('http://' + artist_cover_link)
-        f.write(rec.content)
-    
-    # находим список альбомов артиста с информацией
-    direkt_albums = client.artistsDirectAlbums(artist_id=artist_id)
-    # проходимся по каждому альбому
-    for album in direkt_albums[:1]:
-        print('id_album: ', album['id'], ' - ', album['title'])
+    album = client.albumsWithTracks(album_id=album_id)
+    print('id_album: ', album['id'], ' - ', album['title'])
+    #создаем папку для альбома
+    if album['artists'][0]['various']:
+        album_folder = f"{download_path}/Various artist/{album['title']} ({album['year']})"
+    else:
+        artist_id = album['artists'][0]['id']
+        artist_name = album['artists'][0]['name']
+        artist_cover_link = client.artistsBriefInfo(artist_id=artist_id)['artist']['cover']['uri'].replace('%%',
+                                                                                                           '1000x1000')
+        artist_folder = f"{download_path}/{artist_name}"
+        artist_cover_pic = f"{artist_folder}/artist.jpg"
 
-        #создаем папку для альбома
-        album_folder = f"{artist_folder}/{album['title']} ({album['year']})"
-        os.makedirs(os.path.dirname(f"{album_folder}/"),exist_ok=True)
-        album_cover_pic = f"{album_folder}/cover.jpg"
-        # качаем обложку альбома
-        with open(album_cover_pic, 'wb') as f:
-            rec = requests.get('http://' + album['cover_uri'].replace('%%', '1000x1000'))
+        os.makedirs(os.path.dirname(f"{artist_folder}/"), exist_ok=True)
+        with open(artist_cover_pic, 'wb') as f:  # качаем обложку артиста
+            rec = requests.get('http://' + artist_cover_link)
             f.write(rec.content)
 
-        # проходимся по каждому диску в альбоме
-        volumes = client.albumsWithTracks(album_id=album['id'])['volumes']
-        n_volume = 1
-        for disk in volumes:
-            print('Volume №: ', n_volume, "из ", len(volumes))
-            n_volume += 1
+        album_folder = f"{artist_folder}/{album['title']} ({album['year']})"
 
-            for track in disk: # проходимся по каждому треку в диске
-                track_info = client.tracks_download_info(track_id=track['id'], get_direct_links=True) # узнаем информацию о треке
-                print('ID: ', track['id'], track['title'],'bitrate:', track_info[1]['bitrate_in_kbps'], 'Download: ', track_info[1]['direct_link'])
-                tag_info = client.tracks(track['id'])[0]
-                info = {
-                    'title': tag_info['title'],
-                    'volume_number': tag_info['albums'][0]['track_position']['volume'],
-                    'total_volumes': len(volumes),
-                    'track_position': tag_info['albums'][0]['track_position']['index'],
-                    'total_track': album['track_count'],
-                    'genre': tag_info['albums'][0]['genre'],
-                    'artist': artist_name,
-                    'album_artist': [artist['name'] for artist in album['artists']],
-                    'album': album['title'],
-                    'album_year': album['release_date'][:10],
-                }
+    os.makedirs(os.path.dirname(f"{album_folder}/"),exist_ok=True)
+    album_cover_pic = f"{album_folder}/cover.jpg"
+    # качаем обложку альбома
+    with open(album_cover_pic, 'wb') as f:
+        rec = requests.get('http://' + album['cover_uri'].replace('%%', '1000x1000'))
+        f.write(rec.content)
 
-                disk_folder = f"{album_folder}/Disk {info['volume_number']}"
-                os.makedirs(os.path.dirname(f"{disk_folder}/"), exist_ok=True)
-                track_file = f"{disk_folder}/{info['track_position']} - {info['title'].replace('/', '_')}.mp3"
-                client.request.download(
-                    url=track_info[1]['direct_link'],
-                    filename=track_file
-                )
-                #начинаем закачивать тэги в трек
-                mp3 = music_tag.load_file(track_file)
-                mp3['tracktitle'] = info['title']
-                if album['version'] != None:
-                    mp3['album'] = info['album'] + ' ' + album['version']
-                else:
-                    mp3['album'] = info['album']
-                mp3['discnumber'] = info['volume_number']
-                mp3['totaldiscs'] = info['total_volumes']
-                mp3['tracknumber'] = info['track_position']
-                mp3['totaltracks'] = info['total_track']
-                mp3['genre'] = info['genre']
-                mp3['Year'] = info['album_year']
-                if tag_info['version'] != None:
-                    mp3['comment'] = f"{tag_info['version']} / Release date {info['album_year']}"
-                else:
-                    mp3['comment'] = f"Release date {info['album_year']}"
-                mp3['artist'] = info['artist']
-                mp3['album_artist'] = info['album_artist']
-                mp3['lyrics'] = client.trackSupplement(178499)['lyrics']['full_lyrics']
-                with open(album_cover_pic, 'rb') as img_in:               #ложим картинку в тег "artwork"
-                    mp3['artwork'] = img_in.read()
+    # проходимся по каждому диску в альбоме
 
-                mp3.save()
-    return f"Успешно скачал артиста: {info['artist']} с его {direkt_albums_count} альбомами. Наслаждайся музыкой на Plex"
-'''
+    n_volume = 1
+    for disk in album['volumes']:
+        print('Volume №: ', n_volume, "из ", len(album['volumes']))
+        n_volume += 1
+
+        for track in disk: # проходимся по каждому треку в диске
+            track_info = client.tracks_download_info(track_id=track['id'], get_direct_links=True) # узнаем информацию о треке
+            track_info.sort(reverse=True, key=lambda key: key['bitrate_in_kbps'])
+            print('ID: ', track['id'], track['title'],'bitrate:', track_info[0]['bitrate_in_kbps'], 'Download: ', track_info[1]['direct_link'])
+            tag_info = client.tracks(track['id'])[0]
+            info = {
+                'title': tag_info['title'],
+                'volume_number': track['albums'][0]['track_position']['volume'],
+                'total_volumes': len(album['volumes']),
+                'track_position': track['albums'][0]['track_position']['index'],
+                'total_track': album['track_count'],
+                'genre': tag_info['albums'][0]['genre'],
+                'artist': ', '. join([art['name'] for art in tag_info['artists']]),
+                'album_artist': [artist['name'] for artist in album['artists']],
+                'album': album['title'],
+                'album_year': album['release_date'][:10],
+            }
+
+            disk_folder = f"{album_folder}/Disk {info['volume_number']}"
+            os.makedirs(os.path.dirname(f"{disk_folder}/"), exist_ok=True)
+            track_file = f"{disk_folder}/{info['track_position']} - {info['title'].replace('/', '_')}.mp3"
+            client.request.download(
+                url=track_info[0]['direct_link'],
+                filename=track_file
+            )
+            #начинаем закачивать тэги в трек
+            mp3 = music_tag.load_file(track_file)
+            mp3['tracktitle'] = info['title']
+            if album['version'] != None:
+                mp3['album'] = info['album'] + ' ' + album['version']
+            else:
+                mp3['album'] = info['album']
+            mp3['discnumber'] = info['volume_number']
+            mp3['totaldiscs'] = info['total_volumes']
+            mp3['tracknumber'] = info['track_position']
+            mp3['totaltracks'] = info['total_track']
+            mp3['genre'] = info['genre']
+            mp3['Year'] = info['album_year']
+            if tag_info['version'] != None:
+                mp3['comment'] = f"{tag_info['version']} / Release date {info['album_year']}"
+            else:
+                mp3['comment'] = f"Release date {info['album_year']}"
+            mp3['artist'] = info['artist']
+            mp3['album_artist'] = info['album_artist']
+            mp3['lyrics'] = client.trackSupplement(178499)['lyrics']['full_lyrics']
+            with open(album_cover_pic, 'rb') as img_in:               #ложим картинку в тег "artwork"
+                mp3['artwork'] = img_in.read()
+
+            mp3.save()
+    return f"Успешно скачал альбом/сборник: {info['album']} с его {info['total_track']} композициями. Наслаждайся музыкой на Plex"
+
 type_to_name = {
     'track': 'трек',
     'artist': 'исполнитель',
@@ -261,4 +261,5 @@ def send_search_request_and_print_result(query):
 
 if __name__ == '__main__':
     input_query = input('Введите поисковой запрос:  ')
-    search_and_download_artist(input_query)
+    print(download_album(int(input_query)))
+
