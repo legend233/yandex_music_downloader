@@ -52,7 +52,7 @@ def input_data_artist(message):
         cont_type = 'Artist'
         bot.register_next_step_handler(msg, download_from_input_data, cont_type, artist_result)
     except:
-        bot.send_message(message.chat.id, 'Что-то пошло не так при поиске информации о артисте. Посмотри логи.')
+        bot.send_message(message.chat.id, f'Что-то пошло не так при поиске информации о артисте {artist}. Посмотри логи.')
 
 
 def input_data_albom(message):

@@ -37,7 +37,7 @@ def search_and_download_artist(search:str):
     for album in direkt_albums:
         print('id_album: ', album['id'], ' - ', album['title'])
 
-        #создаем папку для альбома
+        # создаем папку для альбома
         album_folder = f"{artist_folder}/{album['title']} ({album['year']})"
         os.makedirs(os.path.dirname(f"{album_folder}/"),exist_ok=True)
         album_cover_pic = f"{album_folder}/cover.jpg"
@@ -114,15 +114,15 @@ def search_and_download_artist(search:str):
 
                 mp3.save()
 
-
-
     return f"Успешно скачал артиста: {info['artist']} с его {direkt_albums_count} альбомами. Наслаждайся музыкой на Plex"
+
 
 def get_album_info(album_id):
     album = client.albumsWithTracks(album_id=album_id)
     return f"Скачать альбом '{album['title']}' артиста(ов) \
         '{', '. join([art['name'] for art in album['artists']])}' \
             в котором {album['track_count']} треков?"
+
 
 def download_album(album_id):
 
@@ -235,24 +235,13 @@ def send_search_request_and_print_result(query):
 
         text.append(f'{type_to_name.get(type_)}')
 
-        if type_ in ['track', 'podcast_episode']:
-            artists = ''
-            if best.artists:
-                artists = ' - ' + ', '.join(artist.name for artist in best.artists)
-            best_result_text = best.title + artists
-        elif type_ == 'artist':
+        if type_ == 'artist':
             best_result_text = best.name
-        elif type_ in ['album', 'podcast']:
-            best_result_text = best.title
-        elif type_ == 'playlist':
-            best_result_text = best.title
-        elif type_ == 'video':
-            best_result_text = f'{best.title} {best.text}'
 
-        text.append(f' >>>{best_result_text.upper()}<<<')
+        text.append(f' >>>{best_result_text}<<<')
 
     if search_result.artists:
-        text.append(f'(Найденных исполнителей: {search_result.artists.total})')
+        text.append(f"({search_result['artists']['results'][0]['counts']['direct_albums']} - Альбомов)")
 
     text.append('')
     print('\n'.join(text))
@@ -261,5 +250,5 @@ def send_search_request_and_print_result(query):
 
 if __name__ == '__main__':
     input_query = input('Введите поисковой запрос:  ')
-    print(download_album(int(input_query)))
+    print(send_search_request_and_print_result(input_query))
 
