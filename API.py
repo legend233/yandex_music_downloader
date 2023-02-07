@@ -23,99 +23,14 @@ def search_and_download_artist(search: str):
     direkt_albums_count = search_result['artists']['results'][0]['counts']['direct_albums']
     print('Direct albums: ',direkt_albums_count) # вывод количества его альбомов
 
-    artist_cover_link = client.artistsBriefInfo(artist_id=artist_id)['artist']['cover']['uri'].replace('%%', '1000x1000')
-    artist_folder = f"{download_path}/{artist_name}"
-    artist_cover_pic = f"{artist_folder}/artist.jpg"
-
-    os.makedirs(os.path.dirname(f"{artist_folder}/"),exist_ok=True)
-    with open(artist_cover_pic, 'wb') as f:  # качаем обложку артиста
-        rec = requests.get('http://' + artist_cover_link)
-        f.write(rec.content)
-
     # находим список альбомов артиста с информацией
     direkt_albums = client.artistsDirectAlbums(artist_id=artist_id, page_size=1000)
     # проходимся по каждому альбому
     for album in direkt_albums:
-        print('id_album: ', album['id'], ' - ', album['title'])
+        # проходимся по каждому диску в альбоме и загружаем его в папку
+        download_album(album['id'])
 
-        # создаем папку для альбома
-        album_folder = f"{artist_folder}/{album['title']} ({album['year']})"
-        os.makedirs(os.path.dirname(f"{album_folder}/"),exist_ok=True)
-        album_cover_pic = f"{album_folder}/cover.jpg"
-        # качаем обложку альбома
-        with open(album_cover_pic, 'wb') as f:
-            rec = requests.get('http://' + album['cover_uri'].replace('%%', '1000x1000'))
-            f.write(rec.content)
-
-        # проходимся по каждому диску в альбоме
-        volumes = client.albumsWithTracks(album_id=album['id'])['volumes']
-        n_volume = 1
-        for disk in volumes:
-            print('Volume №: ', n_volume, "из ", len(volumes))
-            n_volume += 1
-
-            for track in disk: # проходимся по каждому треку в диске
-                track_info = client.tracks_download_info(track_id=track['id'], get_direct_links=True) # узнаем информацию о треке
-                track_info.sort(reverse=True, key=lambda key: key['bitrate_in_kbps'])
-                print('ID: ', track['id'], track['title'],'bitrate:', track_info[0]['bitrate_in_kbps'], 'Download: ', track_info[0]['direct_link'])
-                tag_info = client.tracks(track['id'])[0]
-                info = {
-                    'title': tag_info['title'],
-                    'volume_number': track['albums'][0]['track_position']['volume'],
-                    'total_volumes': len(volumes),
-                    'track_position': track['albums'][0]['track_position']['index'],
-                    'total_track': album['track_count'],
-                    'genre': tag_info['albums'][0]['genre'],
-                    'artist': ', '. join([art['name'] for art in tag_info['artists']]),
-                    'album_artist': [artist['name'] for artist in album['artists']],
-                    'album': album['title'],
-                    'album_year': album['release_date'][:10],
-                }
-
-
-                disk_folder = f"{album_folder}/Disk {info['volume_number']}"
-                os.makedirs(os.path.dirname(f"{disk_folder}/"), exist_ok=True)
-                track_file = f"{disk_folder}/{info['track_position']} - {info['title'].replace('/', '_')}.mp3"
-                client.request.download(
-                    url=track_info[0]['direct_link'],
-                    filename=track_file
-                )
-
-                #начинаем закачивать тэги в трек
-                mp3 = music_tag.load_file(track_file)
-                mp3['tracktitle'] = info['title']
-                if album['version'] != None:
-                    mp3['album'] = info['album'] + ' ' + album['version']
-                else:
-                    mp3['album'] = info['album']
-                mp3['discnumber'] = info['volume_number']
-                mp3['totaldiscs'] = info['total_volumes']
-                mp3['tracknumber'] = info['track_position']
-                mp3['totaltracks'] = info['total_track']
-                mp3['genre'] = info['genre']
-                mp3['Year'] = info['album_year']
-                if tag_info['version'] != None:
-                    mp3['comment'] = f"{tag_info['version']} / Release date {info['album_year']}"
-                else:
-                    mp3['comment'] = f"Release date {info['album_year']}"
-                mp3['artist'] = info['artist']
-                mp3['album_artist'] = info['album_artist']
-
-                lyrics = client.trackSupplement(track['id'])['lyrics']
-                if lyrics:
-                    with open(track_file.replace('.mp3', '.txt'), 'w', encoding='UTF8') as text_song:
-                        text_song.write(lyrics['full_lyrics'])
-
-                    mp3['lyrics'] = lyrics['full_lyrics']
-                else:
-                    print('Lyrics is missing')
-
-                with open(album_cover_pic, 'rb') as img_in:               #ложим картинку в тег "artwork"
-                    mp3['artwork'] = img_in.read()
-
-                mp3.save()
-
-    return f"Успешно скачал артиста: {info['artist']} с его {direkt_albums_count} альбомами. Наслаждайся музыкой на Plex"
+    return f"Успешно скачал артиста: {artist_name} с его {direkt_albums_count} альбомами. Наслаждайся музыкой на Plex"
 
 
 def get_album_info(album_id):
@@ -176,8 +91,13 @@ def download_album(album_id):
                 'artist': ', '. join([art['name'] for art in tag_info['artists']]),
                 'album_artist': [artist['name'] for artist in album['artists']],
                 'album': album['title'],
-                'album_year': album['release_date'][:10],
             }
+            if album['release_date']:
+                info['album_year'] = album['release_date'][:10]
+            elif album['year']:
+                info['album_year'] = album['year']
+            else:
+                info['album_year'] = ''
 
             disk_folder = f"{album_folder}/Disk {info['volume_number']}"
             os.makedirs(os.path.dirname(f"{disk_folder}/"), exist_ok=True)
