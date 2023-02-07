@@ -7,8 +7,9 @@ from config import ya_token, download_path
 client = Client(token=ya_token)
 client.init()
 
-def search_and_download_artist(search:str):
-    '''Ищем лучший результат по запросу артиста и скачиваем все его песни в папку download с разбивкой по альбомам'''
+
+def search_and_download_artist(search: str):
+    "Ищем лучший результат по запросу артиста и скачиваем все его песни в папку download с разбивкой по альбомам"
 
     try:
         search_result = client.search(search, type_="artist", page=0, nocorrect=False) # поиск
@@ -65,10 +66,10 @@ def search_and_download_artist(search:str):
                     'track_position': track['albums'][0]['track_position']['index'],
                     'total_track': album['track_count'],
                     'genre': tag_info['albums'][0]['genre'],
-                    'artist': artist_name,
+                    'artist': ', '. join([art['name'] for art in tag_info['artists']]),
                     'album_artist': [artist['name'] for artist in album['artists']],
                     'album': album['title'],
-                    'album_year': album['year'],
+                    'album_year': album['release_date'][:10],
                 }
 
 
@@ -204,7 +205,11 @@ def download_album(album_id):
                 mp3['comment'] = f"Release date {info['album_year']}"
             mp3['artist'] = info['artist']
             mp3['album_artist'] = info['album_artist']
-            mp3['lyrics'] = client.trackSupplement(178499)['lyrics']['full_lyrics']
+            lyrics = client.trackSupplement(track['id'])['lyrics']
+            if lyrics:
+                with open(track_file.replace('.mp3', '.txt'), 'w', encoding='UTF8') as text_song:
+                    text_song.write(lyrics['full_lyrics'])
+                mp3['lyrics'] = lyrics['full_lyrics']
             with open(album_cover_pic, 'rb') as img_in:               #ложим картинку в тег "artwork"
                 mp3['artwork'] = img_in.read()
 
