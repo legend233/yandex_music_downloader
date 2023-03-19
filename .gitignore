@@ -2,3 +2,5 @@
 /get/
 /venv/
 /config.py
+/.env
+/.idea
