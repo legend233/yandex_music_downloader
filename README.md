@@ -8,7 +8,6 @@
 для работы необходимо:
 1. Токен вашего яндекс аккаунта (https://github.com/MarshalX/yandex-music-api/)
 2. Токен телеграмм вашего бота (https://lifehacker.ru/kak-sozdat-bota-v-telegram/)
-3. config.py с вашими настройками в папке с программой
 
 # Установка
 ## Linux / MacOS
