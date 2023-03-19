@@ -41,7 +41,8 @@ ______________
     5. pip install python-dotenv music-tag pyTelegramBotAPI yandex-music --upgrade
     6. python tbot.py
 
-
+## Docker
+https://hub.docker.com/r/yuchoba/ya-download
 # Использование
 1. Отправьте команду вашему телеграм боту:
 
