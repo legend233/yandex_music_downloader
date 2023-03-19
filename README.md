@@ -5,11 +5,12 @@
 
 Телеграм бот + скачивание всей музыки артиста (по названию), альбома (по share ссылке), плейлиста (по share ссылке), сборника (по share ссылке) с вашего аккаунта на yandex.music.ru. Рекомендуется для работы в паре с медиосервером.
 для работы необходимо:
-1. Токен вашего яндекс аккаунта
-2. Токен телеграмм вашего бота
+1. Токен вашего яндекс аккаунта (https://github.com/MarshalX/yandex-music-api/)
+2. Токен телеграмм вашего бота (https://lifehacker.ru/kak-sozdat-bota-v-telegram/)
 3. config.py с вашими настройками в папке с программой
 
 # Установка
+## Linux / MacOS
     1. pip install yandex-music --upgrade
     2. pip install pyTelegramBotAPI
     3. git clone 'THIS_PROJECT'
@@ -25,8 +26,25 @@ ______________
 
     6. python tbot.py
 
+## Windows
+    1. запустить git bush
+    2. git clone 'THIS_PROJECT'
+    3. cd yandex_music_downloader
+    4. nano config.py
+______________ 
+#### config.py
+
+    telegramm_token = "YOUR_TOKEN"
+    ya_token = "YOUR_TOKEN"
+    download_path = 'YOUR_DOWNLOAD_PATH'
+______________
+    5. pip install yandex-music --upgrade
+    6. pip install pyTelegramBotAPI
+    7. python tbot.py
+
+
 # Использование
-1. Отправьте команду вашему  телеграм боту:
+1. Отправьте команду вашему телеграм боту:
 
 
     /download
