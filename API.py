@@ -2,11 +2,12 @@ from yandex_music import Client
 import requests
 import os
 import music_tag
-from config import ya_token, download_path
+from dotenv import load_dotenv, find_dotenv
 
-client = Client(token=ya_token)
+load_dotenv(find_dotenv())
+client = Client(token=os.getenv('YA_TOKEN'))
 client.init()
-
+download_path = os.getenv('DOWNLOAD_PATH')
 
 def search_and_download_artist(search: str):
     "Ищем лучший результат по запросу артиста и скачиваем все его песни в папку download с разбивкой по альбомам"
