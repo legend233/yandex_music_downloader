@@ -6,7 +6,7 @@
 
 Телеграм бот + скачивание всей музыки артиста (по названию), альбома (по share ссылке), плейлиста (по share ссылке), сборника (по share ссылке) с вашего аккаунта на yandex.music.ru. Рекомендуется для работы в паре с медиосервером.
 Для работы необходимо:
-1. Токен вашего яндекс аккаунта (https://github.com/MarshalX/yandex-music-api/)
+1. Токен вашего яндекс аккаунта (https://github.com/MarshalX/yandex-music-api/discussions/513#discussioncomment-2729781)
 2. Токен телеграмм вашего бота (https://lifehacker.ru/kak-sozdat-bota-v-telegram/)
 
 
