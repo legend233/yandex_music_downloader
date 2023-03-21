@@ -1,11 +1,11 @@
-# yandex_music_downloader
+# Yandex music downloader
 ### Основано на:
 #### * MarshalX/yandex-music-api https://github.com/MarshalX/yandex-music-api
 #### * Telegram Bot API https://github.com/eternnoir/pyTelegramBotAPI
 #### * music-tag https://github.com/KristoforMaynard/music-tag
 
 Телеграм бот + скачивание всей музыки артиста (по названию), альбома (по share ссылке), плейлиста (по share ссылке), сборника (по share ссылке) с вашего аккаунта на yandex.music.ru. Рекомендуется для работы в паре с медиосервером.
-для работы необходимо:
+Для работы необходимо:
 1. Токен вашего яндекс аккаунта (https://github.com/MarshalX/yandex-music-api/)
 2. Токен телеграмм вашего бота (https://lifehacker.ru/kak-sozdat-bota-v-telegram/)
 
@@ -52,5 +52,5 @@ https://hub.docker.com/r/yuchoba/ya-download
 2. Выберете один из вариантов скачивания, следуйте советом вашего бота.
 3. Музыка скачивается в выбранную вами директорию "YOUR_DOWNLOAD_PATH"
 
-Музыка качаются в максимальном доступном качестве до 320 kbps с записанными тегами, обложкой, текстом песни (в тег и в одноименный файла.txt), если он есть на яндексе.
+Музыка скачивается в максимальном доступном качестве до 320 kbps с записанными тегами, обложкой альбома, текстом песни (в тег и в одноименный файл .txt), если он есть на яндексе.
 
