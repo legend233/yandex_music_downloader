@@ -1,0 +1,4 @@
+python-dotenv
+pyTelegramBotAPI
+yandex-music
+music-tag
