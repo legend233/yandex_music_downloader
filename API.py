@@ -126,11 +126,14 @@ def download_album(album_id):
                 mp3['comment'] = f"Release date {info['album_year']}"
             mp3['artist'] = info['artist']
             mp3['album_artist'] = info['album_artist']
-            lyrics = client.trackSupplement(track['id'])['lyrics']
+            try:
+                lyrics = client.tracks_lyrics(track_id=track['id'], format='TEXT').fetch_lyrics()
+            except:
+                lyrics = False
             if lyrics:
                 with open(track_file.replace('.mp3', '.txt'), 'w', encoding='UTF8') as text_song:
-                    text_song.write(lyrics['full_lyrics'])
-                mp3['lyrics'] = lyrics['full_lyrics']
+                    text_song.write(lyrics)
+                mp3['lyrics'] = lyrics
             with open(album_cover_pic, 'rb') as img_in:               #ложим картинку в тег "artwork"
                 mp3['artwork'] = img_in.read()
 
