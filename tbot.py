@@ -4,15 +4,13 @@
 import telebot
 import os
 from telebot import types
-from API import send_search_request_and_print_result, search_and_download_artist, download_album, get_album_info
+from API import send_search_request_and_print_result, search_and_download_artist, download_album, get_album_info, download_path
 
 from dotenv import load_dotenv, find_dotenv
 
 load_dotenv(find_dotenv())
 
 bot = telebot.TeleBot(os.getenv('TELEGRAMM_TOKEN'))
-
-print("Telegram bot. v0.001")
 
 
 @bot.message_handler(commands=['start'])
@@ -57,7 +55,8 @@ def input_data_artist(message):
         bot.register_next_step_handler(msg, download_from_input_data, cont_type, artist_result)
     except:
         bot.send_message(message.chat.id, f'Что-то пошло не так при поиске информации о артисте {artist}. Посмотри логи.')
-
+        with open(f'{download_path}/log.log', 'rb') as file:
+            bot.send_document(message.chat.id, file)
 
 def input_data_albom(message):
     try:
@@ -74,7 +73,8 @@ def input_data_albom(message):
         bot.register_next_step_handler(msg, download_from_input_data, cont_type, album_id)
     except:
         bot.send_message(message.chat.id, 'Что-то пошло не так при поиске информации о альбоме. Посмотри логи.')
-    
+        with open(f'{download_path}/log.log', 'rb') as file:
+            bot.send_document(message.chat.id, file)
 
 
 def input_data_link(message):
@@ -91,7 +91,8 @@ def download_from_input_data(message, *args):
             bot.send_message(message.chat.id, d_album)
     except:
         bot.send_message(message.chat.id, "Что-то пошло не так при скачивании. Посмотри консоль")
-
+        with open(f'{download_path}/log.log', 'rb') as file:
+            bot.send_document(message.chat.id, file)
 
 bot.polling(none_stop=True)
 
