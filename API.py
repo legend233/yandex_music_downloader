@@ -44,7 +44,8 @@ def get_album_info(album_id):
 def download_album(album_id):
 
     album = client.albumsWithTracks(album_id=album_id)
-    print('id_album: ', album['id'], ' - ', album['title'])
+    album_echo = f"id_album: {album['id']} - {album['title']}"
+    print(album_echo)
     #создаем папку для альбома
     if album['artists'][0]['various']:
         album_folder = f"{download_path}/Various artist/{album['title']} ({album['year']})"
@@ -74,13 +75,15 @@ def download_album(album_id):
 
     n_volume = 1
     for disk in album['volumes']:
-        print('Volume №: ', n_volume, "из ", len(album['volumes']))
+        disk_echo = f"Volume №: {n_volume} из {len(album['volumes'])}"
+        print(disk_echo)
         n_volume += 1
 
         for track in disk: # проходимся по каждому треку в диске
             track_info = client.tracks_download_info(track_id=track['id'], get_direct_links=True) # узнаем информацию о треке
             track_info.sort(reverse=True, key=lambda key: key['bitrate_in_kbps'])
-            print('ID: ', track['id'], track['title'],'bitrate:', track_info[0]['bitrate_in_kbps'], 'Download: ', track_info[1]['direct_link'])
+            track_echo = f"START Download: ID: {track['id']} {track['title']} bitrate: {track_info[0]['bitrate_in_kbps']} {track_info[1]['direct_link']}"
+            print(track_echo)
             tag_info = client.tracks(track['id'])[0]
             info = {
                 'title': tag_info['title'],
@@ -107,6 +110,9 @@ def download_album(album_id):
                 url=track_info[0]['direct_link'],
                 filename=track_file
             )
+            track_echo_ok = "track downloaded\nstart write tag's"
+            print(track_echo_ok)
+
             #начинаем закачивать тэги в трек
             mp3 = music_tag.load_file(track_file)
             mp3['tracktitle'] = info['title']
@@ -138,6 +144,8 @@ def download_album(album_id):
                 mp3['artwork'] = img_in.read()
 
             mp3.save()
+            tags_echo = "Tag's is writed"
+            print(tags_echo)
     return f"Успешно скачал альбом/сборник: {info['album']} с его {info['total_track']} композициями. Наслаждайся музыкой на Plex"
 
 type_to_name = {
@@ -176,8 +184,3 @@ def send_search_request_and_print_result(query):
     print('\n'.join(text))
 
     return ' '.join(text)
-
-if __name__ == '__main__':
-    input_query = input('Введите поисковой запрос:  ')
-    print(send_search_request_and_print_result(input_query))
-
