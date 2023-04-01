@@ -1,4 +1,5 @@
 from yandex_music import Client
+from loguru import logger
 import requests
 import os
 import music_tag
@@ -9,6 +10,11 @@ client = Client(token=os.getenv('YA_TOKEN'))
 client.init()
 download_path = os.getenv('DOWNLOAD_PATH')
 
+logger.add(f"{download_path}/log.log",
+           rotation='00:00', retention='1 week', compression="zip",
+           format="{time: DD-MM-YYYY HH:mm:ss} | {level} | {message}",
+           )
+@logger.catch
 def search_and_download_artist(search: str):
     "Ищем лучший результат по запросу артиста и скачиваем все его песни в папку download с разбивкой по альбомам"
 
@@ -19,11 +25,10 @@ def search_and_download_artist(search: str):
     except:
         print('No results! You sure?')
         return f'Твой запрос: {search} не найден.'
-    print('Artist ID: ', artist_id) # вывод ID
-    print(artist_name) # вывод названия артиста
-    direkt_albums_count = search_result['artists']['results'][0]['counts']['direct_albums']
-    print('Direct albums: ',direkt_albums_count) # вывод количества его альбомов
 
+    direkt_albums_count = search_result['artists']['results'][0]['counts']['direct_albums']
+    artist_echo = f"Start download: Artist ID: {artist_id} / Artist name: {artist_name} / Direct albums: {direkt_albums_count}" # вывод информации о артисте информации по артисту
+    logger.info(artist_echo)
     # находим список альбомов артиста с информацией
     direkt_albums = client.artistsDirectAlbums(artist_id=artist_id, page_size=1000)
     # проходимся по каждому альбому
@@ -33,19 +38,19 @@ def search_and_download_artist(search: str):
 
     return f"Успешно скачал артиста: {artist_name} с его {direkt_albums_count} альбомами. Наслаждайся музыкой на Plex"
 
-
+@logger.catch
 def get_album_info(album_id):
     album = client.albumsWithTracks(album_id=album_id)
     return f"Скачать альбом '{album['title']}' артиста(ов) \
         '{', '. join([art['name'] for art in album['artists']])}' \
             в котором {album['track_count']} треков?"
 
-
+@logger.catch
 def download_album(album_id):
 
     album = client.albumsWithTracks(album_id=album_id)
-    album_echo = f"id_album: {album['id']} - {album['title']}"
-    print(album_echo)
+    album_echo = f"Album ID: {album['id']} / Album title - {album['title']}"
+    logger.info(album_echo)
     #создаем папку для альбома
     if album['artists'][0]['various']:
         album_folder = f"{download_path}/Various artist/{album['title']} ({album['year']})"
@@ -75,15 +80,15 @@ def download_album(album_id):
 
     n_volume = 1
     for disk in album['volumes']:
-        disk_echo = f"Volume №: {n_volume} из {len(album['volumes'])}"
-        print(disk_echo)
+        disk_echo = f"Start download: Volume №: {n_volume} из {len(album['volumes'])}"
+        logger.info(disk_echo)
         n_volume += 1
 
         for track in disk: # проходимся по каждому треку в диске
             track_info = client.tracks_download_info(track_id=track['id'], get_direct_links=True) # узнаем информацию о треке
             track_info.sort(reverse=True, key=lambda key: key['bitrate_in_kbps'])
             track_echo = f"START Download: ID: {track['id']} {track['title']} bitrate: {track_info[0]['bitrate_in_kbps']} {track_info[1]['direct_link']}"
-            print(track_echo)
+            logger.info(track_echo)
             tag_info = client.tracks(track['id'])[0]
             info = {
                 'title': tag_info['title'],
@@ -110,8 +115,8 @@ def download_album(album_id):
                 url=track_info[0]['direct_link'],
                 filename=track_file
             )
-            track_echo_ok = "track downloaded\nstart write tag's"
-            print(track_echo_ok)
+            track_echo_ok = "Track downloaded. Start write tag's."
+            logger.info(track_echo_ok)
 
             #начинаем закачивать тэги в трек
             mp3 = music_tag.load_file(track_file)
@@ -145,7 +150,7 @@ def download_album(album_id):
 
             mp3.save()
             tags_echo = "Tag's is writed"
-            print(tags_echo)
+            logger.info(tags_echo)
     return f"Успешно скачал альбом/сборник: {info['album']} с его {info['total_track']} композициями. Наслаждайся музыкой на Plex"
 
 type_to_name = {
