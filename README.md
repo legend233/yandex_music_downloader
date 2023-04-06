@@ -11,9 +11,9 @@
 2. Токен телеграмм вашего бота (https://lifehacker.ru/kak-sozdat-bota-v-telegram/)
 
 # Установка
-## Linux / MacOS
+## Linux / MacOS / Windows
     1. запустить git bush // для Windows
-    1. запустить терминал // для Linux / MacOS
+    1. запустить терминал // для Linux/MacOS
     2. git clone 'THIS_PROJECT'
     3. cd yandex_music_downloader
     4. pip install -r requirements.txt
