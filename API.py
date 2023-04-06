@@ -80,7 +80,7 @@ def download_album(album_id):
         for track in disk: # проходимся по каждому треку в диске
             track_info = client.tracks_download_info(track_id=track['id'], get_direct_links=True) # узнаем информацию о треке
             track_info.sort(reverse=True, key=lambda key: key['bitrate_in_kbps'])
-            print('ID: ', track['id'], track['title'],'bitrate:', track_info[0]['bitrate_in_kbps'], 'Download: ', track_info[1]['direct_link'])
+            print('ID: ', track['id'], track['title'],'bitrate:', track_info[0]['bitrate_in_kbps'], 'Download: ', track_info[0]['direct_link'])
             tag_info = client.tracks(track['id'])[0]
             info = {
                 'title': tag_info['title'],
