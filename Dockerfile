@@ -5,7 +5,7 @@ RUN pip install --upgrade pip && pip install yandex-music && pip install pyTeleg
 RUN ["mkdir", "/download"]
 ENV TELEGRAMM_TOKEN="telegramm_token"
 ENV YA_TOKEN="ya_token"
-ENV DOWNLOAD_PATH="download"
+ENV DOWNLOAD_PATH="/download"
 WORKDIR /app
 COPY ./API.py .
 COPY ./tbot.py .
