@@ -9,6 +9,7 @@ load_dotenv(find_dotenv())
 client = Client(token=os.getenv('YA_TOKEN'))
 client.init()
 download_path = os.getenv('DOWNLOAD_PATH')
+folder_audiobooks = os.getenv('DOWNLOAD_PATH_BOOKS')
 
 logger.add(f"{download_path}/log.log",
            rotation='00:00', retention='1 week', compression="zip",
@@ -36,7 +37,7 @@ def search_and_download_artist(search: str):
         # проходимся по каждому диску в альбоме и загружаем его в папку
         download_album(album['id'])
 
-    return f"Успешно скачал артиста: {artist_name} с его {direkt_albums_count} альбомами. Наслаждайся музыкой на Plex"
+    return f"Успешно скачал артиста: {artist_name} с его {direkt_albums_count} альбомами."
 
 @logger.catch
 def get_album_info(album_id):
@@ -151,7 +152,89 @@ def download_album(album_id):
             mp3.save()
             tags_echo = "Tag's is writed"
             logger.info(tags_echo)
-    return f"Успешно скачал альбом/сборник: {info['album']} с его {info['total_track']} композициями. Наслаждайся музыкой на Plex"
+    return f"Успешно скачал альбом/сборник: {info['album']} с его {info['total_track']} композициями."
+
+
+@logger.catch
+def get_book_info(album_id):
+    book = client.albumsWithTracks(album_id=album_id)
+    return f"Скачать аудиокнигу '{book['title']}' \
+        в которой {book['track_count']} частей?"
+
+
+@logger.catch
+def download_book(album_id):
+    s = client.albumsWithTracks(album_id=album_id)
+    info_book = {}
+
+    for i in range(len(s['title'])):
+        if s['title'][i] in ',.-:<>;':
+            info_book['author'] = s['title'][:i].strip()
+            if s['version']:
+                info_book['book_title'] = s['title'][i+1:].strip() +' '+ s['version']
+            else:
+                info_book['book_title'] = s['title'][i+1:].strip()
+            break
+
+    info_book['artists'] = ", ".join([x['name'] for x in s['artists']])
+    info_book['cover_url'] = 'https://' + s['cover_uri'].replace('%%', '1000x1000')
+    info_book['parts'] = s['track_count']
+    info_book['labels'] = s['labels'][0]['name']
+    info_book['description'] = s['description']
+    
+    
+    book_echo = f"Book ID: {album_id} / Book title - {info_book['book_title']}"
+    logger.info(book_echo)
+    
+    folder_author = f"{folder_audiobooks}/{info_book['author']}"
+    folder_book = f"{folder_author}/{info_book['book_title']}/"
+    
+    os.makedirs(os.path.dirname(folder_book), exist_ok=True)
+    file_cover = f"{folder_book}/cover.jpg"
+    with open(file_cover, 'wb') as f:
+        rec = requests.get(info_book['cover_url'])
+        f.write(rec.content)
+
+    volumes = s['volumes']
+    for volume in volumes:
+        for part in volume:
+            # начинаем закачивать треки
+            
+            print(part['title'], 'ID: ' + part['id'])
+            track_info = client.tracks_download_info(track_id=part['id'], get_direct_links=True) # узнаем информацию о треке 
+            track_info.sort(reverse=True, key=lambda key: key['bitrate_in_kbps'])
+            part_download_link = track_info[0]['direct_link']
+            
+            part_echo = f"Start Download: ID: {part['id']} {part['title']} bitrate: {track_info[0]['bitrate_in_kbps']} {track_info[0]['direct_link']}"
+            logger.info(part_echo)
+            
+            track_file = f"{folder_book}/{part['albums'][0]['track_position']['index']} - {part['title']}.mp3"
+            with open(track_file, 'wb') as f:
+                rec = requests.get(part_download_link)
+                f.write(rec.content)
+            
+            track_echo_ok = "Track downloaded. Start write tag's."
+            logger.info(track_echo_ok)
+
+            #начинаем закачивать тэги в трек
+            mp3 = music_tag.load_file(track_file)
+            mp3['tracktitle'] = part['title']
+            mp3['album'] = info_book['book_title']
+            mp3['discnumber'] = part['albums'][0]['track_position']['volume']
+            mp3['tracknumber'] = part['albums'][0]['track_position']['index']
+            mp3['totaltracks'] = info_book['parts']
+            mp3['genre'] = s['genre']
+            mp3['Year'] = s['year']
+            mp3['artist'] = info_book['artists']
+            mp3['album_artist'] = info_book['artists']
+            mp3['comment'] = info_book['description']
+            with open(file_cover, 'rb') as img_in:               #ложим картинку в тег "artwork"
+                mp3['artwork'] = img_in.read()
+
+            mp3.save() # сохраняем тэги в mp3
+            tags_echo = "Tag's is writed"
+            logger.info(tags_echo)
+    return f"Успешно скачал аудиокнигу: {info_book['book_title']} из {info_book['parts']} частей"
 
 type_to_name = {
     'track': 'трек',
@@ -163,6 +246,7 @@ type_to_name = {
     'podcast': 'подкаст',
     'podcast_episode': 'эпизод подкаста',
 }
+
 
 
 def send_search_request_and_print_result(query):
@@ -189,3 +273,5 @@ def send_search_request_and_print_result(query):
     print('\n'.join(text))
 
     return ' '.join(text)
+
+
