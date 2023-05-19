@@ -19,7 +19,7 @@ from dotenv import load_dotenv, find_dotenv
 
 load_dotenv(find_dotenv())
 
-bot = telebot.TeleBot(os.getenv('TELEGRAMM_TOKEN_TEST'))
+bot = telebot.TeleBot(os.getenv('TELEGRAMM_TOKEN'))
 
 
 @bot.message_handler(commands=['start'])
