@@ -14,13 +14,15 @@ from API import (
     get_book_info,
     folder_audiobooks,
 )
-
 from dotenv import load_dotenv, find_dotenv
+import queue
+import threading
+
 
 load_dotenv(find_dotenv())
-
-bot = telebot.TeleBot(os.getenv('TELEGRAMM_TOKEN'))
-
+bot = telebot.TeleBot(os.getenv('TELEGRAMM_TOKEN_TEST'))
+download_queue = queue.Queue()
+result_queue = queue.Queue()
 
 @bot.message_handler(commands=['start'])
 def start_message(message):
@@ -71,7 +73,7 @@ def input_data_albom(message):
     try:
         album_id = ''.join([x for x in message.text if x.isdigit()])
         print('Album_id: ', album_id)
-        album_mess = get_album_info(album_id=album_id)
+        album_mess = get_album_info(album_id=album_id) + "\n\nСкачать?"
         bot.send_message(message.chat.id, album_mess)
         markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
         item1 = types.KeyboardButton("Качаем!")
@@ -90,7 +92,7 @@ def input_data_book(message):
     try:
         book_id = ''.join([x for x in message.text if x.isdigit()])
         print('Book_id: ', book_id)
-        book_mess = get_book_info(album_id=book_id)
+        book_mess = get_book_info(album_id=book_id) + "\n\nСкачать?"
         bot.send_message(message.chat.id, book_mess)
         markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
         item1 = types.KeyboardButton("Качаем!")
@@ -108,19 +110,40 @@ def input_data_book(message):
 def download_from_input_data(message, *args):
     try:
         if message.text == 'Качаем!' and args[0] == 'Artist':
-            d_artist = search_and_download_artist(args[1])
-            bot.send_message(message.chat.id, d_artist)
+            download_queue.put((search_and_download_artist, args[1], message.chat.id))
         elif message.text == 'Качаем!' and args[0] == 'Album':
-            d_album = download_album(args[1])
-            bot.send_message(message.chat.id, d_album)
+            download_queue.put((download_album, args[1], message.chat.id))
         elif message.text == 'Качаем!' and args[0] == 'Book':
-            d_book = download_book(args[1])
-            bot.send_message(message.chat.id, d_book)
+            download_queue.put((download_book, args[1], message.chat.id))
+        bot.send_message(message.chat.id, f"Добавил закачку в очередь.\n{download_queue.queue}")
     except:
         bot.send_message(message.chat.id, "Что-то пошло не так при скачивании. Посмотри консоль")
         with open(f'{download_path}/log.log', 'rb') as file:
             bot.send_document(message.chat.id, file)
 
-bot.polling(none_stop=True)
+
+def download_monitor():
+    while True:
+        if download_queue.empty() == False:
+            data = download_queue.get()
+            result = data[2], data[0](data[1])
+            result_queue.put(result)
+
+def result_monitor():
+    while True:
+        if result_queue.empty() == False:
+            result = result_queue.get()
+            bot.send_message(chat_id=result[0], text=result[1])
+
+
+if __name__ == '__main__':
+    download_monitor_thread = threading.Thread(target=download_monitor)
+    download_monitor_thread.start()
+    result_monitor_thread = threading.Thread(target=result_monitor)
+    result_monitor_thread.start()
+    bot_thread = threading.Thread(target=bot.polling, kwargs={'none_stop': True})
+    bot_thread.start()
+
+
 
 

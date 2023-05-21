@@ -3,3 +3,4 @@ pyTelegramBotAPI
 git+https://github.com/MarshalX/yandex-music-api/@dev
 music-tag
 loguru
+requests

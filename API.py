@@ -42,9 +42,8 @@ def search_and_download_artist(search: str):
 @logger.catch
 def get_album_info(album_id):
     album = client.albumsWithTracks(album_id=album_id)
-    return f"Скачать альбом '{album['title']}' артиста(ов) \
-        '{', '. join([art['name'] for art in album['artists']])}' \
-            в котором {album['track_count']} треков?"
+    return f"Альбом:\n'{album['title']}'\nартист:\n'{', '. join([art['name'] for art in album['artists']])}' \
+            количество треков: {album['track_count']}"
 
 @logger.catch
 def download_album(album_id):
@@ -158,8 +157,7 @@ def download_album(album_id):
 @logger.catch
 def get_book_info(album_id):
     book = client.albumsWithTracks(album_id=album_id)
-    return f"Скачать аудиокнигу '{book['title']}' \
-        в которой {book['track_count']} частей?"
+    return f"Аудиокнига:\n{book['title']}\nсодержание из {book['track_count']} частей."
 
 
 @logger.catch
