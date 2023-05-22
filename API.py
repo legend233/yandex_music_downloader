@@ -226,13 +226,14 @@ def download_book(album_id):
             mp3['artist'] = info_book['artists']
             mp3['album_artist'] = info_book['artists']
             mp3['comment'] = info_book['description']
-            with open(file_cover, 'rb') as img_in:               #ложим картинку в тег "artwork"
+            with open(file_cover, 'rb') as img_in:   #ложим картинку в тег "artwork"
                 mp3['artwork'] = img_in.read()
 
             mp3.save() # сохраняем тэги в mp3
             tags_echo = "Tag's is writed"
             logger.info(tags_echo)
     return f"Успешно скачал аудиокнигу: {info_book['book_title']} из {info_book['parts']} частей"
+
 
 type_to_name = {
     'track': 'трек',
@@ -257,18 +258,16 @@ def send_search_request_and_print_result(query):
         type_ = search_result.best.type
         best = search_result.best.result
 
-        text.append(f'{type_to_name.get(type_)}')
+        text.append(f'\n{type_to_name.get(type_)}: ')
 
         if type_ == 'artist':
             best_result_text = best.name
 
-        text.append(f' >>>{best_result_text}<<<')
+        text.append(f'{best_result_text}')
 
     if search_result.artists:
-        text.append(f"({search_result['artists']['results'][0]['counts']['direct_albums']} - Альбомов)")
-
-    text.append('')
-    print('\n'.join(text))
+        text.append(f"\nВсего альбомов: {search_result['artists']['results'][0]['counts']['direct_albums']}")
+    print(' '.join(text))
 
     return ' '.join(text)
 
