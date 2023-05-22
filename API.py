@@ -89,6 +89,7 @@ def download_album(album_id):
             track_info.sort(reverse=True, key=lambda key: key['bitrate_in_kbps'])
             track_echo = f"Start Download: ID: {track['id']} {track['title']} bitrate: {track_info[0]['bitrate_in_kbps']} {track_info[0]['direct_link']}"
             logger.info(track_echo)
+
             tag_info = client.tracks(track['id'])[0]
             info = {
                 'title': tag_info['title'],
