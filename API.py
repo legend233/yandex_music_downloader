@@ -8,7 +8,7 @@ from dotenv import load_dotenv, find_dotenv
 load_dotenv(find_dotenv())
 client = Client(token=os.getenv('YA_TOKEN'))
 client.init()
-download_path = os.getenv('DOWNLOAD_PATH')
+download_path = os.getenv('DOWNLOAD_PATH_MUSIC')
 folder_audiobooks = os.getenv('DOWNLOAD_PATH_BOOKS')
 
 logger.add(f"{download_path}/log.log",

@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
-
+import time
 import telebot
 import os
 from telebot import types
@@ -73,8 +73,8 @@ def input_data_albom(message):
     try:
         album_id = ''.join([x for x in message.text if x.isdigit()])
         print('Album_id: ', album_id)
-        album_mess = get_album_info(album_id=album_id) + "\n\nСкачать?"
-        bot.send_message(message.chat.id, album_mess)
+        album_mess = get_album_info(album_id=album_id)
+        bot.send_message(message.chat.id, album_mess + "\n\nСкачать?")
         markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
         item1 = types.KeyboardButton("Качаем!")
         item2 = types.KeyboardButton("Отмена")
@@ -92,8 +92,8 @@ def input_data_book(message):
     try:
         book_id = ''.join([x for x in message.text if x.isdigit()])
         print('Book_id: ', book_id)
-        book_mess = get_book_info(album_id=book_id) + "\n\nСкачать?"
-        bot.send_message(message.chat.id, book_mess)
+        book_mess = get_book_info(album_id=book_id)
+        bot.send_message(message.chat.id, book_mess + "\n\nСкачать?")
         markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
         item1 = types.KeyboardButton("Качаем!")
         item2 = types.KeyboardButton("Отмена")
@@ -115,7 +115,7 @@ def download_from_input_data(message, *args):
             download_queue.put((download_album, args[1], message.chat.id))
         elif message.text == 'Качаем!' and args[0] == 'Book':
             download_queue.put((download_book, args[1], message.chat.id))
-        bot.send_message(message.chat.id, f"Добавил закачку в очередь.\n{download_queue.queue}")
+        bot.send_message(message.chat.id, f"Добавил закачку в очередь.\nВсего в очереди: {download_queue.qsize()} задачи")
     except:
         bot.send_message(message.chat.id, "Что-то пошло не так при скачивании. Посмотри консоль")
         with open(f'{download_path}/log.log', 'rb') as file:
@@ -124,6 +124,7 @@ def download_from_input_data(message, *args):
 
 def download_monitor():
     while True:
+        time.sleep(10)
         if download_queue.empty() == False:
             data = download_queue.get()
             result = data[2], data[0](data[1])
@@ -131,6 +132,7 @@ def download_monitor():
 
 def result_monitor():
     while True:
+        time.sleep(10)
         if result_queue.empty() == False:
             result = result_queue.get()
             bot.send_message(chat_id=result[0], text=result[1])
