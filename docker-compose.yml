@@ -1,0 +1,12 @@
+version: '2.2'
+services:
+  yandex_downloader:
+    image: yuchoba/ya-download:amd64
+    container_name: yandex_downloader
+    restart: unless-stopped
+    volumes:
+      - YOUR_DOWNLOAD_PATH_BOOKS:/books
+      - YOUR_DOWNLOAD_PATH_MUSIC:/music
+    environment:
+      - TELEGRAMM_TOKEN=YOUR_TELEGRAMM_TOKEN
+      - YA_TOKEN=YOUR_YA_TOKEN
