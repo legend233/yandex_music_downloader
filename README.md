@@ -21,9 +21,10 @@
 ______________ 
 #### .env
 
-    telegramm_token = "YOUR_TOKEN"
-    ya_token = "YOUR_TOKEN"
-    download_path = 'YOUR_DOWNLOAD_PATH'
+    TELEGRAMM_TOKEN=YOUR_TOKEN
+    YA_TOKEN=YOUR_TOKEN
+    DOWNLOAD_PATH_MUSIC=YOUR_DOWNLOAD_PATH
+    DOWNLOAD_PATH_BOOKS=YOUR_DOWNLOAD_PATH
 ______________
 
     6. python tbot.py
@@ -33,7 +34,8 @@ https://hub.docker.com/r/yuchoba/ya-download
 # Использование
 1. Отправьте команду вашему телеграм боту:
 
-
+    /start
+    или
     /download
 
 
