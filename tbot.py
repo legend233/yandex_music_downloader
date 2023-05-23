@@ -74,7 +74,7 @@ def input_data_albom(message):
         album_id = ''.join([x for x in message.text if x.isdigit()])
         print('Album_id: ', album_id)
         album_mess = get_album_info(album_id=album_id)
-        bot.send_message(message.chat.id, album_mess + "\n\nСкачать?")
+        bot.send_message(message.chat.id, album_mess)
         markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
         item1 = types.KeyboardButton("Качаем!")
         item2 = types.KeyboardButton("Отмена")
@@ -93,7 +93,7 @@ def input_data_book(message):
         book_id = ''.join([x for x in message.text if x.isdigit()])
         print('Book_id: ', book_id)
         book_mess = get_book_info(album_id=book_id)
-        bot.send_message(message.chat.id, book_mess + "\n\nСкачать?")
+        bot.send_message(message.chat.id, book_mess)
         markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
         item1 = types.KeyboardButton("Качаем!")
         item2 = types.KeyboardButton("Отмена")
@@ -109,13 +109,16 @@ def input_data_book(message):
 
 def download_from_input_data(message, *args):
     try:
-        if message.text == 'Качаем!' and args[0] == 'Artist':
-            download_queue.put((search_and_download_artist, args[1], message.chat.id))
-        elif message.text == 'Качаем!' and args[0] == 'Album':
-            download_queue.put((download_album, args[1], message.chat.id))
-        elif message.text == 'Качаем!' and args[0] == 'Book':
-            download_queue.put((download_book, args[1], message.chat.id))
-        bot.send_message(message.chat.id, f"Добавил закачку в очередь.\nВсего в очереди: {download_queue.qsize()} задачи")
+        if message.text == 'Качаем!':
+            if args[0] == 'Artist':
+                download_queue.put((search_and_download_artist, args[1], message.chat.id))
+            elif args[0] == 'Album':
+                download_queue.put((download_album, args[1], message.chat.id))
+            elif args[0] == 'Book':
+                download_queue.put((download_book, args[1], message.chat.id))
+            bot.send_message(message.chat.id, f"Добавил закачку в очередь.\nВсего в очереди: {download_queue.qsize()} задачи")
+        else:
+            bot.send_message(message.chat.id, f"Не хочешь? Можешь скачать что-то другое.\nВсего в очереди: {download_queue.qsize()} задачи")
     except:
         bot.send_message(message.chat.id, "Что-то пошло не так при скачивании. Посмотри консоль")
         with open(f'{download_path}/log.log', 'rb') as file:
