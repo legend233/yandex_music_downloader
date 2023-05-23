@@ -120,7 +120,7 @@ def download_from_input_data(message, *args):
         else:
             bot.send_message(message.chat.id, f"Не хочешь? Можешь скачать что-то другое.\nВсего в очереди: {download_queue.qsize()} задачи")
     except:
-        bot.send_message(message.chat.id, "Что-то пошло не так при скачивании. Посмотри консоль")
+        bot.send_message(message.chat.id, "Что-то пошло не так при добавлении в очередь. Посмотри log")
         with open(f'{download_path}/log.log', 'rb') as file:
             bot.send_document(message.chat.id, file)
 
