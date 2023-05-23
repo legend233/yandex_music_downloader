@@ -42,8 +42,8 @@ def search_and_download_artist(search: str):
 @logger.catch
 def get_album_info(album_id):
     album = client.albumsWithTracks(album_id=album_id)
-    return f"Альбом:\n'{album['title']}'\nартист:\n'{', '. join([art['name'] for art in album['artists']])}' \
-            количество треков: {album['track_count']}"
+    return f"Альбом: {album['title']}\nартист:{', '. join([art['name'] for art in album['artists']])} \
+            \nколичество треков: {album['track_count']}"
 
 @logger.catch
 def download_album(album_id):
@@ -263,7 +263,7 @@ def send_search_request_and_print_result(query):
         if type_ == 'artist':
             best_result_text = best.name
 
-        text.append(f'{best_result_text}')
+        text.append(f'>>>{best_result_text}<<<')
 
     if search_result.artists:
         text.append(f"\nВсего альбомов: {search_result['artists']['results'][0]['counts']['direct_albums']}")
