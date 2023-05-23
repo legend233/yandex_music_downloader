@@ -142,13 +142,8 @@ def result_monitor():
 
 
 if __name__ == '__main__':
-    download_monitor_thread = threading.Thread(target=download_monitor)
+    download_monitor_thread = threading.Thread(target=download_monitor, daemon=True)
     download_monitor_thread.start()
-    result_monitor_thread = threading.Thread(target=result_monitor)
+    result_monitor_thread = threading.Thread(target=result_monitor, daemon=True)
     result_monitor_thread.start()
-    bot_thread = threading.Thread(target=bot.polling, kwargs={'none_stop': True})
-    bot_thread.start()
-
-
-
-
+    bot.polling(none_stop=True)
