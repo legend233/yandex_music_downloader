@@ -10,6 +10,7 @@ client = Client(token=os.getenv('YA_TOKEN'))
 client.init()
 download_path = os.getenv('DOWNLOAD_PATH_MUSIC')
 folder_audiobooks = os.getenv('DOWNLOAD_PATH_BOOKS')
+wrong_symbols = r"#<$+%>!`&*‘|?{}“=>/:\@"
 
 logger.add(f"{download_path}/log.log",
            rotation='00:00', retention='1 week', compression="zip",
@@ -67,7 +68,7 @@ def download_album(album_id):
             rec = requests.get('http://' + artist_cover_link)
             f.write(rec.content)
 
-        album_folder = f"{artist_folder}/{album['title']} ({album['year']})"
+        album_folder = f"{artist_folder}/{''.join([_ for _ in album['title'] if _ not in wrong_symbols])} ({album['year']})"
 
     os.makedirs(os.path.dirname(f"{album_folder}/"),exist_ok=True)
     album_cover_pic = f"{album_folder}/cover.jpg"
@@ -110,7 +111,7 @@ def download_album(album_id):
 
             disk_folder = f"{album_folder}/Disk {info['volume_number']}"
             os.makedirs(os.path.dirname(f"{disk_folder}/"), exist_ok=True)
-            track_file = f"{disk_folder}/{info['track_position']} - {info['title'].replace('/', '_')}.mp3"
+            track_file = f"{disk_folder}/{info['track_position']} - {''.join([ _ for _ in info['title'] if _ not in wrong_symbols])}.mp3"
             client.request.download(
                 url=track_info[0]['direct_link'],
                 filename=track_file
@@ -185,7 +186,7 @@ def download_book(album_id):
     logger.info(book_echo)
     
     folder_author = f"{folder_audiobooks}/{info_book['author']}"
-    folder_book = f"{folder_author}/{info_book['book_title']}/"
+    folder_book = f"{folder_author}/{''.join([ _ for _ in info_book['book_title'] if _ not in wrong_symbols])}/"
     
     os.makedirs(os.path.dirname(folder_book), exist_ok=True)
     file_cover = f"{folder_book}/cover.jpg"
@@ -206,7 +207,7 @@ def download_book(album_id):
             part_echo = f"Start Download: ID: {part['id']} {part['title']} bitrate: {track_info[0]['bitrate_in_kbps']} {track_info[0]['direct_link']}"
             logger.info(part_echo)
             
-            track_file = f"{folder_book}/{part['albums'][0]['track_position']['index']} - {part['title']}.mp3"
+            track_file = f"{folder_book}/{part['albums'][0]['track_position']['index']} - {''.join([ _ for _ in part['title'] if _ not in wrong_symbols])}.mp3"
             with open(track_file, 'wb') as f:
                 rec = requests.get(part_download_link)
                 f.write(rec.content)
