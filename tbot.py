@@ -5,12 +5,12 @@ import telebot
 import os
 from telebot import types
 from API import (
-    send_search_request_and_print_result, 
-    search_and_download_artist, 
-    download_album, 
-    get_album_info, 
-    download_path, 
-    download_book, 
+    send_search_request_and_print_result,
+    search_and_download_artist,
+    download_album,
+    get_album_info,
+    folder_music,
+    download_book,
     get_book_info,
     folder_audiobooks,
 )
@@ -66,7 +66,7 @@ def input_data_artist(message):
         bot.register_next_step_handler(msg, download_from_input_data, cont_type, artist_result)
     except:
         bot.send_message(message.chat.id, f'Что-то пошло не так при поиске информации о артисте {artist}. Посмотри логи.')
-        with open(f'{download_path}/log.log', 'rb') as file:
+        with open(f'{folder_music}/log.log', 'rb') as file:
             bot.send_document(message.chat.id, file)
 
 def input_data_albom(message):
@@ -84,7 +84,7 @@ def input_data_albom(message):
         bot.register_next_step_handler(msg, download_from_input_data, cont_type, album_id)
     except:
         bot.send_message(message.chat.id, 'Что-то пошло не так при поиске информации о альбоме. Посмотри логи.')
-        with open(f'{download_path}/log.log', 'rb') as file:
+        with open(f'{folder_music}/log.log', 'rb') as file:
             bot.send_document(message.chat.id, file)
 
 
@@ -103,7 +103,7 @@ def input_data_book(message):
         bot.register_next_step_handler(msg, download_from_input_data, cont_type, book_id)
     except:
         bot.send_message(message.chat.id, 'Что-то пошло не так при поиске информации о аудиокниге. Посмотри логи.')
-        with open(f'{download_path}/log.log', 'rb') as file:
+        with open(f'{folder_music}/log.log', 'rb') as file:
             bot.send_document(message.chat.id, file)
 
 
@@ -121,7 +121,7 @@ def download_from_input_data(message, *args):
             bot.send_message(message.chat.id, f"Не хочешь? Можешь скачать что-то другое.\nВсего в очереди: {download_queue.qsize()} задачи")
     except:
         bot.send_message(message.chat.id, "Что-то пошло не так при добавлении в очередь. Посмотри log")
-        with open(f'{download_path}/log.log', 'rb') as file:
+        with open(f'{folder_music}/log.log', 'rb') as file:
             bot.send_document(message.chat.id, file)
 
 

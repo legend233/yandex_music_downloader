@@ -4,10 +4,12 @@ RUN apk update && apk upgrade && apk add git && apk add bash
 RUN pip install --upgrade pip
 RUN ["mkdir", "/music"]
 RUN ["mkdir", "/books"]
+RUN ["mkdir", "/podcasts"]
 ENV TELEGRAMM_TOKEN="telegramm_token"
 ENV YA_TOKEN="ya_token"
 ENV DOWNLOAD_PATH_MUSIC="/music"
 ENV DOWNLOAD_PATH_BOOKS="/books"
+ENV DOWNLOAD_PATH_PODCASTS="/podcasts"
 WORKDIR /app
 COPY ./API.py .
 COPY ./tbot.py .
