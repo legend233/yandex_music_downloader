@@ -13,6 +13,8 @@ from API import (
     download_book,
     get_book_info,
     folder_audiobooks,
+    get_podcast_info,
+    download_podcast,
 )
 from dotenv import load_dotenv, find_dotenv
 import queue
@@ -35,7 +37,8 @@ def download_command(message):
     item1 = types.KeyboardButton("Артиста")
     item2 = types.KeyboardButton("Альбом")
     item3 = types.KeyboardButton('Книгу')
-    markup.add(item1, item2, item3)
+    item4 = types.KeyboardButton('Подкаст')
+    markup.add(item1, item2, item3, item4)
     msg = bot.send_message(message.chat.id, 'Что будем качать?', reply_markup=markup)
     bot.register_next_step_handler(msg, take_you_choise)
 
@@ -50,6 +53,9 @@ def take_you_choise(message):
     elif message.text == "Книгу":
         msg = bot.send_message(message.chat.id, 'Кинь мне ссылку на книгу с яндекс-музыки')
         bot.register_next_step_handler(msg, input_data_book)
+    elif message.text == "Подкаст":
+        msg = bot.send_message(message.chat.id, 'Кинь мне ссылку на подкаст с яндекс-музыки')
+        bot.register_next_step_handler(msg, input_data_podcast)
 
 
 def input_data_artist(message):
@@ -107,6 +113,25 @@ def input_data_book(message):
             bot.send_document(message.chat.id, file)
 
 
+def input_data_podcast(message):
+    try:
+        podcast_id = ''.join([x for x in message.text if x.isdigit()])
+        print('Podcast_id: ', podcast_id)
+        podcast_mess = get_podcast_info(podcast_id=podcast_id)
+        bot.send_message(message.chat.id, podcast_mess)
+        markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
+        item1 = types.KeyboardButton("Качаем!")
+        item2 = types.KeyboardButton("Отмена")
+        markup.add(item1, item2)
+        msg = bot.send_message(message.chat.id, 'Качаем этот подкаст?', reply_markup=markup)
+        cont_type = 'Podcast'
+        bot.register_next_step_handler(msg, download_from_input_data, cont_type, podcast_id)
+    except:
+        bot.send_message(message.chat.id, 'Что-то пошло не так при поиске информации о подкасте. Посмотри логи.')
+        with open(f'{folder_music}/log.log', 'rb') as file:
+            bot.send_document(message.chat.id, file)
+
+
 def download_from_input_data(message, *args):
     try:
         if message.text == 'Качаем!':
@@ -116,9 +141,11 @@ def download_from_input_data(message, *args):
                 download_queue.put((download_album, args[1], message.chat.id))
             elif args[0] == 'Book':
                 download_queue.put((download_book, args[1], message.chat.id))
+            elif args[0] == 'Podcast':
+                download_queue.put((download_podcast, args[1], message.chat.id))
             bot.send_message(message.chat.id, f"Добавил закачку в очередь.\nВсего в очереди: {download_queue.qsize()} задачи")
         else:
-            bot.send_message(message.chat.id, f"Не хочешь? Можешь скачать что-то другое.\nВсего в очереди: {download_queue.qsize()} задачи")
+            bot.send_message(message.chat.id, f"Не хочешь? Можешь скачать что-то другое.")
     except:
         bot.send_message(message.chat.id, "Что-то пошло не так при добавлении в очередь. Посмотри log")
         with open(f'{folder_music}/log.log', 'rb') as file:
