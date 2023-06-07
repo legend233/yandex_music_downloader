@@ -238,6 +238,12 @@ def download_book(album_id):
 
 
 @logger.catch
+def get_podcast_info(podcast_id):
+    podcast = client.albumsWithTracks(album_id=podcast_id)
+    return f"Подкаст:\n{podcast['title']}\nсодержание из {podcast['track_count']} выпусков."
+
+
+@logger.catch
 def download_podcast(podcast_id):
     s = client.albumsWithTracks(album_id=podcast_id)
     info_podcast = {}
