@@ -263,16 +263,19 @@ def download_podcast(podcast_id):
 
     os.makedirs(os.path.dirname(folder_podcast), exist_ok=True)
     file_cover = f"{folder_podcast}cover.jpg"
+    file_description = f"{folder_podcast}info.txt"
+
     with open(file_cover, 'wb') as f:
         rec = requests.get(info_podcast['cover_url'])
         f.write(rec.content)
 
+    with open(file_description, 'w') as f:
+        f.write(info_podcast['description'])
+
     volumes = s['volumes']
     for volume in volumes:
-        for part in volume[:3]:
+        for part in volume:
             # начинаем закачивать выпуски подкастов
-
-            print(part['title'], 'ID: ' + part['id'])
             track_info = client.tracks_download_info(track_id=part['id'],
                                                      get_direct_links=True)  # узнаем информацию о выпуске
             track_info.sort(reverse=True, key=lambda key: key['bitrate_in_kbps'])
@@ -281,7 +284,7 @@ def download_podcast(podcast_id):
             part_echo = f"Start Download: ID: {part['id']} {part['title']} bitrate: {track_info[0]['bitrate_in_kbps']} {track_info[0]['direct_link']}"
             logger.info(part_echo)
 
-            track_file = f"{folder_podcast}/#{part['albums'][0]['track_position']['index']} - {''.join([_ for _ in part['title'] if _ not in wrong_symbols])}.mp3"
+            track_file = f"{folder_podcast}/#{part['albums'][0]['track_position']['volume']}-{part['albums'][0]['track_position']['index']} - {''.join([_ for _ in part['title'] if _ not in wrong_symbols])}.mp3"
             with open(track_file, 'wb') as f:
                 rec = requests.get(part_download_link)
                 f.write(rec.content)
@@ -298,7 +301,8 @@ def download_podcast(podcast_id):
             mp3['totaltracks'] = info_podcast['tracks']
             mp3['artist'] = info_podcast['title']
             mp3['album_artist'] = info_podcast['title']
-            mp3['comment'] = info_podcast['description']
+            mp3['comment'] = part['short_description']
+
             with open(file_cover, 'rb') as img_in:  # ложим картинку в тег "artwork"
                 mp3['artwork'] = img_in.read()
 

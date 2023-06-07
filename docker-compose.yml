@@ -7,6 +7,7 @@ services:
     volumes:
       - YOUR_DOWNLOAD_PATH_BOOKS:/books
       - YOUR_DOWNLOAD_PATH_MUSIC:/music
+      - YOUR_DOWNLOAD_PATH_PODCASTS:/podcasts
     environment:
       - TELEGRAMM_TOKEN=YOUR_TELEGRAMM_TOKEN
       - YA_TOKEN=YOUR_YA_TOKEN
