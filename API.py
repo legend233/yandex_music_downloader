@@ -179,7 +179,8 @@ def download_book(album_id):
     info_book['artists'] = ", ".join([x['name'] for x in s['artists']])
     info_book['cover_url'] = 'https://' + s['cover_uri'].replace('%%', '1000x1000')
     info_book['parts'] = s['track_count']
-    info_book['labels'] = s['labels'][0]['name']
+    if s['labels']:
+        info_book['labels'] = s['labels'][0]['name']
     info_book['description'] = s['description']
     
     
@@ -199,8 +200,7 @@ def download_book(album_id):
     for volume in volumes:
         for part in volume:
             # начинаем закачивать треки
-            
-            print(part['title'], 'ID: ' + part['id'])
+
             track_info = client.tracks_download_info(track_id=part['id'], get_direct_links=True) # узнаем информацию о треке 
             track_info.sort(reverse=True, key=lambda key: key['bitrate_in_kbps'])
             part_download_link = track_info[0]['direct_link']
@@ -248,15 +248,6 @@ def download_podcast(podcast_id):
     s = client.albumsWithTracks(album_id=podcast_id)
     info_podcast = {}
     info_podcast['title'] = s['title']
-    for i in range(len(s['title'])):
-        if s['title'][i] in ',.-:<>;':
-            info_podcast['title'] = s['title'][:i].strip()
-            if s['version']:
-                info_podcast['title'] = s['title'][i + 1:].strip() + ' ' + s['version']
-            else:
-                info_podcast['title'] = s['title'][i + 1:].strip()
-            break
-
     info_podcast['cover_url'] = 'https://' + s['cover_uri'].replace('%%', '1000x1000')
     info_podcast['tracks'] = s['track_count']
     info_podcast['short_description'] = s['short_description']
@@ -265,7 +256,7 @@ def download_podcast(podcast_id):
     podcast_echo = f"Podcast ID: {podcast_id} / Podcast title - {info_podcast['title']}"
     logger.info(podcast_echo)
 
-    folder_podcast = f"{folder_podcasts}/{info_podcast['title']}/"
+    folder_podcast = f"{folder_podcasts}/{''.join([_ for _ in info_podcast['title'] if _ not in wrong_symbols])}/"
 
     os.makedirs(os.path.dirname(folder_podcast), exist_ok=True)
     file_cover = f"{folder_podcast}cover.jpg"

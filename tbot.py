@@ -22,9 +22,8 @@ import threading
 
 
 load_dotenv(find_dotenv())
-bot = telebot.TeleBot(os.getenv('TELEGRAMM_TOKEN'))
-download_queue = queue.Queue()
-result_queue = queue.Queue()
+bot = telebot.TeleBot(os.getenv('TELEGRAMM_TOKEN_TEST'))
+download_queue = list()
 
 @bot.message_handler(commands=['start'])
 def start_message(message):
@@ -97,7 +96,6 @@ def input_data_albom(message):
 def input_data_book(message):
     try:
         book_id = ''.join([x for x in message.text if x.isdigit()])
-        print('Book_id: ', book_id)
         book_mess = get_book_info(album_id=book_id)
         bot.send_message(message.chat.id, book_mess)
         markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
@@ -116,7 +114,6 @@ def input_data_book(message):
 def input_data_podcast(message):
     try:
         podcast_id = ''.join([x for x in message.text if x.isdigit()])
-        print('Podcast_id: ', podcast_id)
         podcast_mess = get_podcast_info(podcast_id=podcast_id)
         bot.send_message(message.chat.id, podcast_mess)
         markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
@@ -136,14 +133,14 @@ def download_from_input_data(message, *args):
     try:
         if message.text == 'Качаем!':
             if args[0] == 'Artist':
-                download_queue.put((search_and_download_artist, args[1], message.chat.id))
+                download_queue.append((search_and_download_artist, args[1], message.chat.id))
             elif args[0] == 'Album':
-                download_queue.put((download_album, args[1], message.chat.id))
+                download_queue.append((download_album, args[1], message.chat.id))
             elif args[0] == 'Book':
-                download_queue.put((download_book, args[1], message.chat.id))
+                download_queue.append((download_book, args[1], message.chat.id))
             elif args[0] == 'Podcast':
-                download_queue.put((download_podcast, args[1], message.chat.id))
-            bot.send_message(message.chat.id, f"Добавил закачку в очередь.\nВсего в очереди: {download_queue.qsize()} задачи")
+                download_queue.append((download_podcast, args[1], message.chat.id))
+            bot.send_message(message.chat.id, f"Добавил закачку в очередь.\nВсего в очереди: {len(download_queue)} задачи")
         else:
             bot.send_message(message.chat.id, f"Не хочешь? Можешь скачать что-то другое.")
     except:
@@ -155,22 +152,19 @@ def download_from_input_data(message, *args):
 def download_monitor():
     while True:
         time.sleep(10)
-        if download_queue.empty() == False:
-            data = download_queue.get()
-            result = data[2], data[0](data[1])
-            result_queue.put(result)
-
-def result_monitor():
-    while True:
-        time.sleep(10)
-        if result_queue.empty() == False:
-            result = result_queue.get()
-            bot.send_message(chat_id=result[0], text=result[1])
-
+        if download_queue != []:
+            data = download_queue[0]
+            try:
+                result = data[0](data[1])
+                bot.send_message(chat_id=data[2], text=result)
+            except:
+                bot.send_message(chat_id=data[2], text=f"Что-то пошло не так при скачивании ID:{data[1]}. Посмотри log")
+            download_queue.pop(0)
+            bot.send_message(data[2], f"Всего осталось в очереди: {len(download_queue)} задачи")
 
 if __name__ == '__main__':
     download_monitor_thread = threading.Thread(target=download_monitor, daemon=True)
     download_monitor_thread.start()
-    result_monitor_thread = threading.Thread(target=result_monitor, daemon=True)
-    result_monitor_thread.start()
-    bot.polling(none_stop=True)
+    bot_thread = threading.Thread(target=bot.polling, daemon=True, kwargs={'none_stop': True})
+    bot_thread.start()
+    bot_thread.join()
