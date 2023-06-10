@@ -22,7 +22,7 @@ import threading
 
 
 load_dotenv(find_dotenv())
-bot = telebot.TeleBot(os.getenv('TELEGRAMM_TOKEN_TEST'))
+bot = telebot.TeleBot(os.getenv('TELEGRAMM_TOKEN'))
 download_queue = list()
 
 @bot.message_handler(commands=['start'])
