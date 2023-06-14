@@ -8,16 +8,18 @@ from dotenv import load_dotenv, find_dotenv
 load_dotenv(find_dotenv())
 client = Client(token=os.getenv('YA_TOKEN'))
 client.init()
-download_path = os.getenv('DOWNLOAD_PATH_MUSIC')
+folder_music = os.getenv('DOWNLOAD_PATH_MUSIC')
 folder_audiobooks = os.getenv('DOWNLOAD_PATH_BOOKS')
-
-logger.add(f"{download_path}/log.log",
+folder_podcasts = os.getenv('DOWNLOAD_PATH_PODCASTS')
+wrong_symbols = r"#<$+%>!`&*‘|?{}“=>/:\@" # спецсимволы которые негативно влияют на создание каталогов и файлов
+# настройки логирования
+logger.add(f"{folder_music}/log.log",
            rotation='00:00', retention='1 week', compression="zip",
            format="{time: DD-MM-YYYY HH:mm:ss} | {level} | {message}",
            )
 @logger.catch
 def search_and_download_artist(search: str):
-    "Ищем лучший результат по запросу артиста и скачиваем все его песни в папку download с разбивкой по альбомам"
+    """Ищем лучший результат по запросу артиста и скачиваем все его песни в папку download с разбивкой по альбомам"""
 
     try:
         search_result = client.search(search, type_="artist", page=0, nocorrect=False) # поиск
@@ -29,7 +31,7 @@ def search_and_download_artist(search: str):
 
     direkt_albums_count = search_result['artists']['results'][0]['counts']['direct_albums']
     artist_echo = f"Start download: Artist ID: {artist_id} / Artist name: {artist_name} / Direct albums: {direkt_albums_count}" # вывод информации о артисте информации по артисту
-    logger.info(artist_echo)
+    logger.info(artist_echo) # вывод в лог
     # находим список альбомов артиста с информацией
     direkt_albums = client.artistsDirectAlbums(artist_id=artist_id, page_size=1000)
     # проходимся по каждому альбому
@@ -41,25 +43,26 @@ def search_and_download_artist(search: str):
 
 @logger.catch
 def get_album_info(album_id):
+    """Получаем информацию о альбоме"""
     album = client.albumsWithTracks(album_id=album_id)
     return f"Альбом: {album['title']}\nартист:{', '. join([art['name'] for art in album['artists']])} \
             \nколичество треков: {album['track_count']}"
 
 @logger.catch
 def download_album(album_id):
-
+    "Скачиваем альбом"
     album = client.albumsWithTracks(album_id=album_id)
     album_echo = f"Album ID: {album['id']} / Album title - {album['title']}"
-    logger.info(album_echo)
+    logger.info(album_echo) # вывод в лог
     #создаем папку для альбома
     if album['artists'][0]['various']:
-        album_folder = f"{download_path}/Various artist/{album['title']} ({album['year']})"
+        album_folder = f"{folder_music}/Various artist/{album['title']} ({album['year']})"
     else:
         artist_id = album['artists'][0]['id']
         artist_name = album['artists'][0]['name']
         artist_cover_link = client.artistsBriefInfo(artist_id=artist_id)['artist']['cover']['uri'].replace('%%',
                                                                                                            '1000x1000')
-        artist_folder = f"{download_path}/{artist_name}"
+        artist_folder = f"{folder_music}/{artist_name}"
         artist_cover_pic = f"{artist_folder}/artist.jpg"
 
         os.makedirs(os.path.dirname(f"{artist_folder}/"), exist_ok=True)
@@ -67,7 +70,7 @@ def download_album(album_id):
             rec = requests.get('http://' + artist_cover_link)
             f.write(rec.content)
 
-        album_folder = f"{artist_folder}/{album['title']} ({album['year']})"
+        album_folder = f"{artist_folder}/{''.join([_ for _ in album['title'] if _ not in wrong_symbols])} ({album['year']})"
 
     os.makedirs(os.path.dirname(f"{album_folder}/"),exist_ok=True)
     album_cover_pic = f"{album_folder}/cover.jpg"
@@ -81,14 +84,14 @@ def download_album(album_id):
     n_volume = 1
     for disk in album['volumes']:
         disk_echo = f"Start download: Volume №: {n_volume} из {len(album['volumes'])}"
-        logger.info(disk_echo)
+        logger.info(disk_echo) # вывод в лог
         n_volume += 1
 
         for track in disk: # проходимся по каждому треку в диске
             track_info = client.tracks_download_info(track_id=track['id'], get_direct_links=True) # узнаем информацию о треке
             track_info.sort(reverse=True, key=lambda key: key['bitrate_in_kbps'])
             track_echo = f"Start Download: ID: {track['id']} {track['title']} bitrate: {track_info[0]['bitrate_in_kbps']} {track_info[0]['direct_link']}"
-            logger.info(track_echo)
+            logger.info(track_echo) # вывод в лог
             tag_info = client.tracks(track['id'])[0]
             info = {
                 'title': tag_info['title'],
@@ -110,13 +113,13 @@ def download_album(album_id):
 
             disk_folder = f"{album_folder}/Disk {info['volume_number']}"
             os.makedirs(os.path.dirname(f"{disk_folder}/"), exist_ok=True)
-            track_file = f"{disk_folder}/{info['track_position']} - {info['title'].replace('/', '_')}.mp3"
+            track_file = f"{disk_folder}/{info['track_position']} - {''.join([ _ for _ in info['title'] if _ not in wrong_symbols])}.mp3"
             client.request.download(
                 url=track_info[0]['direct_link'],
                 filename=track_file
             )
             track_echo_ok = "Track downloaded. Start write tag's."
-            logger.info(track_echo_ok)
+            logger.info(track_echo_ok)  # вывод в лог
 
             #начинаем закачивать тэги в трек
             mp3 = music_tag.load_file(track_file)
@@ -150,18 +153,20 @@ def download_album(album_id):
 
             mp3.save()
             tags_echo = "Tag's is writed"
-            logger.info(tags_echo)
+            logger.info(tags_echo)  # вывод в лог
     return f"Успешно скачал альбом/сборник: {info['album']} с его {info['total_track']} композициями."
 
 
 @logger.catch
 def get_book_info(album_id):
+    """Получаем информацию о книге"""
     book = client.albumsWithTracks(album_id=album_id)
     return f"Аудиокнига:\n{book['title']}\nсодержание из {book['track_count']} частей."
 
 
 @logger.catch
 def download_book(album_id):
+    """Скачиваем аудиокнигу"""
     s = client.albumsWithTracks(album_id=album_id)
     info_book = {}
 
@@ -177,15 +182,16 @@ def download_book(album_id):
     info_book['artists'] = ", ".join([x['name'] for x in s['artists']])
     info_book['cover_url'] = 'https://' + s['cover_uri'].replace('%%', '1000x1000')
     info_book['parts'] = s['track_count']
-    info_book['labels'] = s['labels'][0]['name']
+    if s['labels']:
+        info_book['labels'] = s['labels'][0]['name']
     info_book['description'] = s['description']
     
     
     book_echo = f"Book ID: {album_id} / Book title - {info_book['book_title']}"
-    logger.info(book_echo)
+    logger.info(book_echo)  # вывод в лог
     
     folder_author = f"{folder_audiobooks}/{info_book['author']}"
-    folder_book = f"{folder_author}/{info_book['book_title']}/"
+    folder_book = f"{folder_author}/{''.join([ _ for _ in info_book['book_title'] if _ not in wrong_symbols])}/"
     
     os.makedirs(os.path.dirname(folder_book), exist_ok=True)
     file_cover = f"{folder_book}/cover.jpg"
@@ -197,22 +203,21 @@ def download_book(album_id):
     for volume in volumes:
         for part in volume:
             # начинаем закачивать треки
-            
-            print(part['title'], 'ID: ' + part['id'])
+
             track_info = client.tracks_download_info(track_id=part['id'], get_direct_links=True) # узнаем информацию о треке 
             track_info.sort(reverse=True, key=lambda key: key['bitrate_in_kbps'])
             part_download_link = track_info[0]['direct_link']
             
             part_echo = f"Start Download: ID: {part['id']} {part['title']} bitrate: {track_info[0]['bitrate_in_kbps']} {track_info[0]['direct_link']}"
-            logger.info(part_echo)
+            logger.info(part_echo)  # вывод в лог
             
-            track_file = f"{folder_book}/{part['albums'][0]['track_position']['index']} - {part['title']}.mp3"
+            track_file = f"{folder_book}/{part['albums'][0]['track_position']['index']} - {''.join([ _ for _ in part['title'] if _ not in wrong_symbols])}.mp3"
             with open(track_file, 'wb') as f:
                 rec = requests.get(part_download_link)
                 f.write(rec.content)
             
             track_echo_ok = "Track downloaded. Start write tag's."
-            logger.info(track_echo_ok)
+            logger.info(track_echo_ok)  # вывод в лог
 
             #начинаем закачивать тэги в трек
             mp3 = music_tag.load_file(track_file)
@@ -231,8 +236,81 @@ def download_book(album_id):
 
             mp3.save() # сохраняем тэги в mp3
             tags_echo = "Tag's is writed"
-            logger.info(tags_echo)
+            logger.info(tags_echo)  # вывод в лог
     return f"Успешно скачал аудиокнигу: {info_book['book_title']} из {info_book['parts']} частей"
+
+
+@logger.catch
+def get_podcast_info(podcast_id):
+    """Получаем информацию о подкасте"""
+    podcast = client.albumsWithTracks(album_id=podcast_id)
+    return f"Подкаст:\n{podcast['title']}\nсодержание из {podcast['track_count']} выпусков."
+
+
+@logger.catch
+def download_podcast(podcast_id):
+    s = client.albumsWithTracks(album_id=podcast_id)
+    info_podcast = {}
+    info_podcast['title'] = s['title']
+    info_podcast['cover_url'] = 'https://' + s['cover_uri'].replace('%%', '1000x1000')
+    info_podcast['tracks'] = s['track_count']
+    info_podcast['short_description'] = s['short_description']
+    info_podcast['description'] = s['description']
+
+    podcast_echo = f"Podcast ID: {podcast_id} / Podcast title - {info_podcast['title']}"
+    logger.info(podcast_echo)  # вывод в лог
+
+    folder_podcast = f"{folder_podcasts}/{''.join([_ for _ in info_podcast['title'] if _ not in wrong_symbols])}/"
+
+    os.makedirs(os.path.dirname(folder_podcast), exist_ok=True)
+    file_cover = f"{folder_podcast}cover.jpg"
+    file_description = f"{folder_podcast}info.txt"
+
+    with open(file_cover, 'wb') as f:
+        rec = requests.get(info_podcast['cover_url']) 
+        f.write(rec.content) # записываем картинку обложки
+
+    with open(file_description, 'w') as f:
+        f.write(info_podcast['description']) 
+
+    volumes = s['volumes']
+    for volume in volumes:
+        for part in volume:
+            # начинаем закачивать выпуски подкастов
+            track_info = client.tracks_download_info(track_id=part['id'],
+                                                     get_direct_links=True)  # узнаем информацию о выпуске
+            track_info.sort(reverse=True, key=lambda key: key['bitrate_in_kbps'])
+            part_download_link = track_info[0]['direct_link']
+
+            part_echo = f"Start Download: ID: {part['id']} {part['title']} bitrate: {track_info[0]['bitrate_in_kbps']} {track_info[0]['direct_link']}"
+            logger.info(part_echo)  # вывод в лог
+
+            track_file = f"{folder_podcast}/#{part['albums'][0]['track_position']['volume']}-{part['albums'][0]['track_position']['index']} - {''.join([_ for _ in part['title'] if _ not in wrong_symbols])}.mp3"
+            with open(track_file, 'wb') as f:
+                rec = requests.get(part_download_link)
+                f.write(rec.content)
+
+            track_echo_ok = "Track downloaded. Start write tag's."
+            logger.info(track_echo_ok)  # вывод в лог
+
+            # начинаем закачивать тэги в трек
+            mp3 = music_tag.load_file(track_file)
+            mp3['tracktitle'] = part['title']
+
+            mp3['discnumber'] = part['albums'][0]['track_position']['volume']
+            mp3['tracknumber'] = part['albums'][0]['track_position']['index']
+            mp3['totaltracks'] = info_podcast['tracks']
+            mp3['artist'] = info_podcast['title']
+            mp3['album_artist'] = info_podcast['title']
+            mp3['comment'] = part['short_description']
+
+            with open(file_cover, 'rb') as img_in:  # ложим картинку в тег "artwork"
+                mp3['artwork'] = img_in.read()
+
+            mp3.save()  # сохраняем тэги в mp3
+            tags_echo = "Tag's is writed"
+            logger.info(tags_echo)  # вывод в лог
+    return f"Успешно скачал подкаст: {info_podcast['title']} из {info_podcast['tracks']} выпусков"
 
 
 type_to_name = {
@@ -247,8 +325,8 @@ type_to_name = {
 }
 
 
-
 def send_search_request_and_print_result(query):
+    """Отправляем запрос с названием артиста/группы и выводим результаты"""
     search_result = client.search(query)
 
     text = [f'Результаты по запросу "{query}":', '']
@@ -270,5 +348,3 @@ def send_search_request_and_print_result(query):
     print(' '.join(text))
 
     return ' '.join(text)
-
-
