@@ -21,12 +21,13 @@ import threading
 
 
 load_dotenv(find_dotenv())
-bot = telebot.TeleBot(os.getenv('TELEGRAMM_TOKEN'))
+bot = telebot.TeleBot(os.getenv('TELEGRAMM_TOKEN_TEST'))
 download_queue = list()
 
 @bot.message_handler(commands=['start'])
 def start_message(message):
-    bot.send_message(message.chat.id, 'Привет, хочешь скачать музыку или аудиокниги? /download')
+    bot.send_message(message.chat.id, 'Привет, хочешь скачать музыку, аудиокниги, подкасты? /download')
+
 
 
 @bot.message_handler(commands=['download'])
@@ -179,6 +180,36 @@ def download_monitor():
                 bot.send_message(chat_id=data[2], text=f"Что-то пошло не так при скачивании ID:{data[1]}. Посмотри log")
             download_queue.pop(0)
             bot.send_message(data[2], f"Всего осталось в очереди: {len(download_queue)} задачи")
+
+
+@bot.message_handler(commands=['files']) # ToDO: переписать
+def what_files(message):
+    bot.send_message(message.chat.id, 'Какие тебе нужны?')
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
+    item1 = types.KeyboardButton("Музыка")
+    item2 = types.KeyboardButton("Аудиокнига")
+    item3 = types.KeyboardButton('Подкаст')
+    markup.add(item1, item2, item3)
+    msg = bot.send_message(message.chat.id, 'Что будем качать?', reply_markup=markup)
+    bot.register_next_step_handler(msg, take_you_choise_files)
+
+
+@bot.message_handler(content_types=['text']) # ToDO: переписать
+def take_you_choise_files(message):
+    """Эта функция обрабатывает сообщение, запрашивает у пользователя дополнительную информацию в зависимости от текста сообщения и регистрирует обработчик следующего шага."""
+    if message.text == "Музыка":
+        markup = types.InlineKeyboardMarkup()
+        switch_button = types.InlineKeyboardButton(text='Try', callback_data='Try')
+        markup.add(switch_button)
+        bot.send_message(message.chat.id, "Выбирай музыку", reply_markup=markup)
+
+        print('сработало')
+    elif message.text == "Аудиокнига":
+        msg = bot.send_message(message.chat.id, 'Выбирай аудиокнигу')
+        bot.register_next_step_handler(msg, input_data_albom)
+    elif message.text == "Подкаст":
+        msg = bot.send_message(message.chat.id, 'Выбирай подкаст')
+        bot.register_next_step_handler(msg, input_data_podcast)
 
 if __name__ == '__main__':
     download_monitor_thread = threading.Thread(target=download_monitor, daemon=True)
