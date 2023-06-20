@@ -15,14 +15,17 @@ from API import (
     folder_audiobooks,
     get_podcast_info,
     download_podcast,
+    folder_podcasts
 )
 from dotenv import load_dotenv, find_dotenv
 import threading
 from loguru import logger
+import shutil
 
-
+cur_dir = folder_music
+root_dir = folder_music
 load_dotenv(find_dotenv())
-bot = telebot.TeleBot(os.getenv('TELEGRAMM_TOKEN_TEST'))
+bot = telebot.TeleBot(os.getenv('TELEGRAMM_TOKEN'))
 download_queue = list()
 
 @bot.message_handler(commands=['start'])
@@ -183,34 +186,82 @@ def download_monitor():
             bot.send_message(data[2], f"Всего осталось в очереди: {len(download_queue)} задачи")
 
 
-@bot.message_handler(commands=['files']) # ToDO: переписать
+@bot.message_handler(commands=['files'])
 def what_files(message):
-    bot.send_message(message.chat.id, 'Какие тебе нужны?')
-    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
-    item1 = types.KeyboardButton("Музыка")
-    item2 = types.KeyboardButton("Аудиокнига")
-    item3 = types.KeyboardButton('Подкаст')
+    markup = types.InlineKeyboardMarkup()
+    item1 = types.InlineKeyboardButton(text='Музыка', callback_data='files_music')
+    item2 = types.InlineKeyboardButton(text='Аудиокнига', callback_data='files_book')
+    item3 = types.InlineKeyboardButton(text='Подкаст', callback_data='files_podcast')
     markup.add(item1, item2, item3)
-    msg = bot.send_message(message.chat.id, 'Что будем качать?', reply_markup=markup)
-    bot.register_next_step_handler(msg, take_you_choise_files)
+    msg = bot.send_message(message.chat.id, 'Какие файлы тебе нужны?', reply_markup=markup)
 
 
-@bot.message_handler(content_types=['text']) # ToDO: переписать
-def take_you_choise_files(message):
-    """Эта функция обрабатывает сообщение, запрашивает у пользователя дополнительную информацию в зависимости от текста сообщения и регистрирует обработчик следующего шага."""
-    if message.text == "Музыка":
+@bot.callback_query_handler(func=lambda call: True)
+def callback_inline(call):
+    global cur_dir
+    global root_dir
+    global dir_ls
+    global files_ls
+    
+    def callmenu():
+        dir_ls = [folder for folder in os.listdir(cur_dir) if os.path.isdir(cur_dir+'/'+folder)]
+        files_ls = [filee for filee in os.listdir(cur_dir) if os.path.isfile(cur_dir+'/'+filee)]
+        mess = os.path.abspath(cur_dir).replace(os.path.abspath(root_dir), '') 
         markup = types.InlineKeyboardMarkup()
-        switch_button = types.InlineKeyboardButton(text='Try', callback_data='Try')
-        markup.add(switch_button)
-        bot.send_message(message.chat.id, "Выбирай музыку", reply_markup=markup)
+        dirs_buttons = [types.InlineKeyboardButton(text='📁 '+folder, callback_data=folder) for folder in dir_ls]
+        files_buttons = [types.InlineKeyboardButton(text='💾 '+filee, callback_data=filee) for filee in files_ls]
+        back_button = types.InlineKeyboardButton(text='⬅️ НАЗАД', callback_data='Back')
+        exit_button = types.InlineKeyboardButton(text='❌ ВЫХОД', callback_data='Exit')
+        download_button = types.InlineKeyboardButton(text='⬇️ Скачать все!', callback_data='Download')
+        markup.add(download_button, back_button, exit_button, *dirs_buttons, *files_buttons)
+        bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text='/'+mess, reply_markup=markup)
 
-        print('сработало')
-    elif message.text == "Аудиокнига":
-        msg = bot.send_message(message.chat.id, 'Выбирай аудиокнигу')
-        bot.register_next_step_handler(msg, input_data_albom)
-    elif message.text == "Подкаст":
-        msg = bot.send_message(message.chat.id, 'Выбирай подкаст')
-        bot.register_next_step_handler(msg, input_data_podcast)
+    if call.data == 'files_music':
+        cur_dir = folder_music
+        root_dir = folder_music
+        callmenu()
+    elif call.data == "files_book":
+        cur_dir = folder_audiobooks
+        root_dir = folder_audiobooks
+        callmenu()
+    elif call.data == "files_podcast":
+        cur_dir = folder_podcasts
+        root_dir = folder_podcasts
+        callmenu()
+
+    elif call.data == 'Download':
+        if os.path.abspath(cur_dir) != os.path.abspath(root_dir):
+            send_temp_file = root_dir + '/' + cur_dir[cur_dir.rfind('/'):]
+            shutil.make_archive(send_temp_file, 'zip', cur_dir)
+            try:
+                with open(f'{send_temp_file}.zip', 'rb') as file:
+                    bot.send_document(call.message.chat.id, file)
+            except telebot.apihelper.ApiTelegramException:
+                bot.send_message(call.message.chat.id, "сработало ограничение в 50 мб")
+            finally:
+                os.remove(path=f'{send_temp_file}.zip')
+        else:
+            bot.send_message(call.message.chat.id, "Нельзя качать в корневом каталоге!", reply_markup=None)
+    elif call.data == 'Back':
+        if os.path.abspath(cur_dir) != os.path.abspath(root_dir):
+            cur_dir = os.path.join(cur_dir, '..')
+        else:
+            bot.send_message(call.message.chat.id, "Ты в корневом каталоге! Выше нельзя", reply_markup=None)
+        callmenu()
+    elif call.data == 'Exit':
+        bot.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
+        bot.send_message(call.message.chat.id, "Не хочешь... Как хочешь!", reply_markup=None)
+    elif call.data in [folder for folder in os.listdir(cur_dir) if os.path.isdir(cur_dir+'/'+folder)]:
+        cur_dir = os.path.join(cur_dir, call.data)
+        callmenu()
+    elif call.data in [filee for filee in os.listdir(cur_dir) if os.path.isfile(cur_dir+'/'+filee)]:
+        send_file = cur_dir + '/' + call.data
+        try:
+            with open(f'{send_file}', 'rb') as file:
+                bot.send_document(call.message.chat.id, file)
+        except telebot.apihelper.ApiTelegramException:
+            bot.send_message(call.message.chat.id, "сработало ограничение в 50 мб")
+
 
 @logger.catch
 def echo_status(downloader_status, bot_status):
