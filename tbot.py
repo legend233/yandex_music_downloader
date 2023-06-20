@@ -18,6 +18,7 @@ from API import (
 )
 from dotenv import load_dotenv, find_dotenv
 import threading
+from loguru import logger
 
 
 load_dotenv(find_dotenv())
@@ -211,9 +212,28 @@ def take_you_choise_files(message):
         msg = bot.send_message(message.chat.id, 'Выбирай подкаст')
         bot.register_next_step_handler(msg, input_data_podcast)
 
+@logger.catch
+def echo_status(downloader_status, bot_status):
+    while True:
+        
+        if not downloader_status or not bot_status:
+            mess = f"Внимание!!!\nСтатус потока скачивания: {downloader_status.is_alive()}\nСтатус потока бота: {bot_status.is_alive()}"
+            logger.info(mess)
+            time.sleep(600)
+        else:
+            mess = f"\nСтатус потока скачивания: {downloader_status.is_alive()}\nСтатус потока бота: {bot_status.is_alive()}"
+            logger.info(mess)
+            time.sleep(3600)
+
+
 if __name__ == '__main__':
-    download_monitor_thread = threading.Thread(target=download_monitor, daemon=True)
+    download_monitor_thread = threading.Thread(target=download_monitor)
     download_monitor_thread.start() # запуск потока скачивания медиафайлов
-    bot_thread = threading.Thread(target=bot.polling, daemon=True, kwargs={'none_stop': True})
+    bot_thread = threading.Thread(target=bot.polling, kwargs={'none_stop': True})
     bot_thread.start() # запуск бота в отдельном потоке
-    bot_thread.join() # ожидание завершения
+    
+    echo_status_thread = threading.Thread(target=echo_status, kwargs={
+        'downloader_status': download_monitor_thread,
+        'bot_status': bot_thread})
+    echo_status_thread.start()
+    
