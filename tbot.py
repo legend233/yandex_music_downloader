@@ -196,7 +196,7 @@ def what_files(message):
     msg = bot.send_message(message.chat.id, 'Какие файлы тебе нужны?', reply_markup=markup)
 
 
-@bot.callback_query_handler(func=lambda call: True)
+@bot.callback_query_handler(func=lambda call: True) # TODO: максимальное количество кнопок под сообщением 64. Нужно организовать слайды для большого количества файлов, папок.
 def callback_inline(call):
     global cur_dir
     global root_dir
