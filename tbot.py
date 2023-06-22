@@ -26,7 +26,7 @@ start_window = 0
 cur_dir = folder_music
 root_dir = folder_music
 load_dotenv(find_dotenv())
-bot = telebot.TeleBot(os.getenv('TELEGRAMM_TOKEN_TEST'))
+bot = telebot.TeleBot(os.getenv('TELEGRAMM_TOKEN'))
 download_queue = list()
 
 @bot.message_handler(commands=['start'])
@@ -198,8 +198,9 @@ def what_files(message):
     msg = bot.send_message(message.chat.id, 'Какие файлы тебе нужны?', reply_markup=markup)
 
 
-@bot.callback_query_handler(func=lambda call: True) # TODO: максимальное количество кнопок под сообщением 64. Нужно организовать слайды для большого количества файлов, папок.
+@bot.callback_query_handler(func=lambda call: True)
 def callback_inline(call):
+    '''обработчик команды files. Отображает файловый менеджер с возможностью скачивать.'''
     global cur_dir
     global root_dir
     global dir_ls
@@ -211,7 +212,7 @@ def callback_inline(call):
         bot.send_message(call.message.chat.id, "Не хочешь... Как хочешь!", reply_markup=None)
     elif call.data == 'Download':
             if os.path.abspath(cur_dir) != os.path.abspath(root_dir):
-                send_temp_file = root_dir + '/' + cur_dir[cur_dir.rfind('/'):]
+                send_temp_file = root_dir + '/' + os.path.abspath(cur_dir)[cur_dir.rfind('/'):]
                 shutil.make_archive(send_temp_file, 'zip', cur_dir)
                 try:
                     with open(f'{send_temp_file}.zip', 'rb') as file:
@@ -236,15 +237,16 @@ def callback_inline(call):
             root_dir = folder_podcasts
 
         elif call.data == 'Back':
+            start_window = 0
             if os.path.abspath(cur_dir) != os.path.abspath(root_dir):
                 cur_dir = os.path.join(cur_dir, '..')
             else:
                 bot.send_message(call.message.chat.id, "Ты в корневом каталоге! Выше нельзя", reply_markup=None)
         
-        elif call.data in dir_ls:
+        elif call.data in [a[:45] for a in dir_ls]:
             cur_dir = os.path.join(cur_dir, call.data)
             start_window = 0
-        elif call.data in files_ls:
+        elif call.data in [x[:45] for x in files_ls]:
             send_file = cur_dir + '/' + call.data
             try:
                 with open(f'{send_file}', 'rb') as file:
@@ -252,34 +254,36 @@ def callback_inline(call):
             except telebot.apihelper.ApiTelegramException:
                 bot.send_message(call.message.chat.id, "сработало ограничение в 50 мб")
 
-        elif call.data == 'Prev_page':
-            start_window -= 21
+        elif call.data == 'PrevP':
+            start_window -= 15
             if start_window < 0:
                 start_window = 0
-        elif call.data == 'Next_page':
-            if start_window + 21 < len(dir_ls+files_ls):
-                start_window += 21
+        elif call.data == 'NextP':
+            if start_window + 15 < len(dir_ls + files_ls):
+                start_window += 15
+            else:
+                bot.send_message(call.message.chat.id, "Нет больше файлов", reply_markup=None)
         
-        print(start_window)
         dir_ls = [folder for folder in os.listdir(cur_dir) if os.path.isdir(cur_dir+'/'+folder)]
         files_ls = [filee for filee in os.listdir(cur_dir) if os.path.isfile(cur_dir+'/'+filee)]
         mess = os.path.abspath(cur_dir).replace(os.path.abspath(root_dir), '') 
         markup = types.InlineKeyboardMarkup()
-        dirs_buttons = [types.InlineKeyboardButton(text='📁 '+folder, callback_data=folder) for folder in dir_ls]
+        dirs_buttons = [types.InlineKeyboardButton(text='📁 '+folder, callback_data=folder[:45]) for folder in dir_ls]
         files_buttons = [types.InlineKeyboardButton(text='💾 '+filee, callback_data=filee) for filee in files_ls]
-        item_inwindow_buttons = (dirs_buttons + files_buttons)
+        item_inwindow_buttons = (dirs_buttons + files_buttons)[start_window:start_window+15]
+    
         back_button = types.InlineKeyboardButton(text='⬅️ НАЗАД', callback_data='Back')
         exit_button = types.InlineKeyboardButton(text='❌ ВЫХОД', callback_data='Exit')
-        download_button = types.InlineKeyboardButton(text='⬇️ Скачать все!', callback_data='Download')
+        download_button = types.InlineKeyboardButton(text='📲 Скачать все!', callback_data='Download')
         
-        prev_page_button = types.InlineKeyboardButton(text='Пред.стр.', callback_data='Prev_page') # TODO: пока не работает пролистывание страниц
-        next_page_button = types.InlineKeyboardButton(text='След.стр.', callback_data='Next_page') # TODO: пока не работает пролистывание страниц
+        prev_page_button = types.InlineKeyboardButton(text='◀️ Пред.стр.', callback_data='PrevP')
+        next_page_button = types.InlineKeyboardButton(text='▶️ След.стр.', callback_data='NextP')
         
-        markup.add(download_button, back_button, exit_button, *item_inwindow_buttons[start_window:start_window+21], prev_page_button, next_page_button)
-        
+        markup.add(download_button, back_button, exit_button, *item_inwindow_buttons)
+        if len(dirs_buttons + files_buttons) > 15:
+            markup.add(prev_page_button, next_page_button)
         bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text='/'+mess, reply_markup=markup)
-        print(item_inwindow_buttons)
-
+        
 @logger.catch
 def echo_status(downloader_status, bot_status):
     while True:
