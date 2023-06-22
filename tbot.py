@@ -267,8 +267,8 @@ def callback_inline(call):
                 bot.send_message(call.message.chat.id, "сработало ограничение в 50 мб")
 
         
-        dir_ls = [folder for folder in os.listdir(cur_dir) if os.path.isdir(cur_dir+'/'+folder)]
-        files_ls = [filee for filee in os.listdir(cur_dir) if os.path.isfile(cur_dir+'/'+filee)]
+        dir_ls = sorted([folder for folder in os.listdir(cur_dir) if os.path.isdir(cur_dir+'/'+folder)])
+        files_ls = sorted([filee for filee in os.listdir(cur_dir) if os.path.isfile(cur_dir+'/'+filee)])
         mess = os.path.abspath(cur_dir).replace(os.path.abspath(root_dir), '') 
         markup = types.InlineKeyboardMarkup()
         dirs_buttons = [types.InlineKeyboardButton(text='📁 '+folder, callback_data=folder[:45]) for folder in dir_ls]
