@@ -269,7 +269,7 @@ def callback_inline(call):
         mess = os.path.abspath(cur_dir).replace(os.path.abspath(root_dir), '') 
         markup = types.InlineKeyboardMarkup()
         dirs_buttons = [types.InlineKeyboardButton(text='📁 '+folder, callback_data=folder[:45]) for folder in dir_ls]
-        files_buttons = [types.InlineKeyboardButton(text='💾 '+filee, callback_data=filee) for filee in files_ls]
+        files_buttons = [types.InlineKeyboardButton(text='💾 '+filee, callback_data=filee[:45]) for filee in files_ls]
         item_inwindow_buttons = (dirs_buttons + files_buttons)[start_window:start_window+15]
     
         back_button = types.InlineKeyboardButton(text='⬅️ НАЗАД', callback_data='Back')
