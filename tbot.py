@@ -243,17 +243,6 @@ def callback_inline(call):
             else:
                 bot.send_message(call.message.chat.id, "Ты в корневом каталоге! Выше нельзя", reply_markup=None)
         
-        elif call.data in [a[:45] for a in dir_ls]:
-            cur_dir = os.path.join(cur_dir, call.data)
-            start_window = 0
-        elif call.data in [x[:45] for x in files_ls]:
-            send_file = cur_dir + '/' + call.data
-            try:
-                with open(f'{send_file}', 'rb') as file:
-                    bot.send_document(call.message.chat.id, file)
-            except telebot.apihelper.ApiTelegramException:
-                bot.send_message(call.message.chat.id, "сработало ограничение в 50 мб")
-
         elif call.data == 'PrevP':
             start_window -= 15
             if start_window < 0:
@@ -263,6 +252,20 @@ def callback_inline(call):
                 start_window += 15
             else:
                 bot.send_message(call.message.chat.id, "Нет больше файлов", reply_markup=None)
+
+        elif call.data in [a[:45] for a in dir_ls]:
+            cur_dir = os.path.join(cur_dir, call.data)
+            start_window = 0
+        elif call.data in [x[:45] for x in files_ls]:
+            for _ in files_ls:
+                if call.data in _:
+                    send_file = cur_dir + '/' + _
+            try:
+                with open(f'{send_file}', 'rb') as file:
+                    bot.send_document(call.message.chat.id, file)
+            except telebot.apihelper.ApiTelegramException:
+                bot.send_message(call.message.chat.id, "сработало ограничение в 50 мб")
+
         
         dir_ls = [folder for folder in os.listdir(cur_dir) if os.path.isdir(cur_dir+'/'+folder)]
         files_ls = [filee for filee in os.listdir(cur_dir) if os.path.isfile(cur_dir+'/'+filee)]
