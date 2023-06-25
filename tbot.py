@@ -263,16 +263,16 @@ def callback_inline(call):
             else:
                 bot.send_message(call.message.chat.id, "Нет больше файлов", reply_markup=None)
 
-        elif call.data in [''.join([y for y in x if y.isalnum()])[:45] for x in dir_ls]:
+        elif call.data in [''.join([y for y in x if y.isalnum()])[:15] for x in dir_ls]:
             for _ in dir_ls:
-                if call.data == ''.join([y for y in _ if y.isalnum()])[:45]:
+                if call.data == ''.join([y for y in _ if y.isalnum()])[:15]:
                     cur_dir = os.path.join(cur_dir, _)
             start_window = 0
 
-        elif call.data in [''.join([y for y in x if y.isalnum()])[:45] for x in files_ls]:
+        elif call.data in [''.join([y for y in x if y.isalnum()])[:15] for x in files_ls]:
             block_send_status = True
             for _ in files_ls:
-                if call.data == ''.join([y for y in _ if y.isalnum()])[:45]:
+                if call.data == ''.join([y for y in _ if y.isalnum()])[:15]:
                     send_file = cur_dir + '/' + _
                     print(send_file)
 
@@ -289,8 +289,8 @@ def callback_inline(call):
         files_ls = sorted([filee for filee in os.listdir(cur_dir) if os.path.isfile(cur_dir+'/'+filee)])
         mess = os.path.abspath(cur_dir).replace(os.path.abspath(root_dir), '') 
         markup = types.InlineKeyboardMarkup()
-        dirs_buttons = [types.InlineKeyboardButton(text='📁 '+folder, callback_data=''.join([x for x in folder if x.isalnum()])[:45]) for folder in dir_ls]
-        files_buttons = [types.InlineKeyboardButton(text='💾 '+filee, callback_data=''.join([x for x in filee if x.isalnum()])[:45]) for filee in files_ls]
+        dirs_buttons = [types.InlineKeyboardButton(text='📁 '+folder, callback_data=''.join([x for x in folder if x.isalnum()])[:15]) for folder in dir_ls]
+        files_buttons = [types.InlineKeyboardButton(text='💾 '+filee, callback_data=''.join([x for x in filee if x.isalnum()])[:15]) for filee in files_ls]
         item_inwindow_buttons = (dirs_buttons + files_buttons)[start_window:start_window+15]
     
         back_button = types.InlineKeyboardButton(text='⬅️ НАЗАД', callback_data='Back')
