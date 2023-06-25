@@ -25,9 +25,12 @@ import shutil
 start_window = 0
 cur_dir = folder_music
 root_dir = folder_music
+dir_ls = []
+files_ls = []
 load_dotenv(find_dotenv())
-bot = telebot.TeleBot(os.getenv('TELEGRAMM_TOKEN'))
+bot = telebot.TeleBot(os.getenv('TELEGRAMM_TOKEN_TEST'))
 download_queue = list()
+
 
 @bot.message_handler(commands=['start'])
 def start_message(message):
@@ -196,6 +199,7 @@ def what_files(message):
     item3 = types.InlineKeyboardButton(text='Подкаст', callback_data='files_podcast')
     markup.add(item1, item2, item3)
     msg = bot.send_message(message.chat.id, 'Какие файлы тебе нужны?', reply_markup=markup)
+    logger.info(f"Пользователь {message.chat.id} открыл инлайн меню просмотра файлов")
 
 
 @bot.callback_query_handler(func=lambda call: True)
@@ -206,23 +210,29 @@ def callback_inline(call):
     global dir_ls
     global files_ls
     global start_window
-    
+    block_send_status = False
     if call.data == 'Exit':
+        block_send_status = True
         bot.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
         bot.send_message(call.message.chat.id, "Не хочешь... Как хочешь!", reply_markup=None)
-    elif call.data == 'Download':
-            if os.path.abspath(cur_dir) != os.path.abspath(root_dir):
-                send_temp_file = root_dir + '/' + os.path.abspath(cur_dir)[cur_dir.rfind('/'):]
-                shutil.make_archive(send_temp_file, 'zip', cur_dir)
-                try:
-                    with open(f'{send_temp_file}.zip', 'rb') as file:
-                        bot.send_document(call.message.chat.id, file)
-                except telebot.apihelper.ApiTelegramException:
-                    bot.send_message(call.message.chat.id, "сработало ограничение в 50 мб")
-                finally:
-                    os.remove(path=f'{send_temp_file}.zip')
-            else:
-                bot.send_message(call.message.chat.id, "Нельзя качать в корневом каталоге!", reply_markup=None)
+        logger.info(f"Пользователь {call.message.chat.id} закрыл инлайн меню просмотра файлов")
+    elif call.data == 'DownloadFolder':
+        block_send_status = True
+        if os.path.abspath(cur_dir) != os.path.abspath(root_dir):
+            send_temp_file = root_dir + cur_dir[cur_dir.rfind('/'):]
+            shutil.make_archive(send_temp_file, 'zip', cur_dir)
+            try:
+                with open(f'{send_temp_file}.zip', 'rb') as f:
+                    bot.send_document(call.message.chat.id, f)
+                logger.info(f"Пользователь {call.message.chat.id} скачал архив с содержимим каталога {cur_dir}")
+            except telebot.apihelper.ApiTelegramException:
+                bot.send_message(call.message.chat.id, "сработало ограничение в 50 мб")
+                logger.info(f"Пользователь {call.message.chat.id} не смог скачать архив с содержимим каталога {cur_dir}. Сработало ограничение в 50 мб")
+            finally:
+                os.remove(path=f'{send_temp_file}.zip')
+        else:
+            bot.send_message(call.message.chat.id, "Нельзя качать в корневом каталоге!", reply_markup=None)
+
     else:
         if call.data == 'files_music':
             cur_dir = folder_music
@@ -256,28 +266,34 @@ def callback_inline(call):
         elif call.data in [a[:45] for a in dir_ls]:
             cur_dir = os.path.join(cur_dir, call.data)
             start_window = 0
-        elif call.data in [x[:45] for x in files_ls]:
+
+        elif call.data in [''.join([y for y in x if y.isalpha()])[:45] for x in files_ls]:
+            block_send_status = True
             for _ in files_ls:
-                if call.data in _:
+                if call.data == ''.join([y for y in _ if y.isalpha()])[:45]:
                     send_file = cur_dir + '/' + _
+                    print(send_file)
+
             try:
-                with open(f'{send_file}', 'rb') as file:
-                    bot.send_document(call.message.chat.id, file)
+                with open(f'{send_file}', 'rb') as f:
+                    bot.send_document(call.message.chat.id, f)
+                logger.info(f"File {send_file} sended!!!")
             except telebot.apihelper.ApiTelegramException:
                 bot.send_message(call.message.chat.id, "сработало ограничение в 50 мб")
+                logger.error(f"сработало ограничение в 50 мб: {send_file} > 50 мб")
 
-        
+    if not block_send_status:
         dir_ls = sorted([folder for folder in os.listdir(cur_dir) if os.path.isdir(cur_dir+'/'+folder)])
         files_ls = sorted([filee for filee in os.listdir(cur_dir) if os.path.isfile(cur_dir+'/'+filee)])
         mess = os.path.abspath(cur_dir).replace(os.path.abspath(root_dir), '') 
         markup = types.InlineKeyboardMarkup()
         dirs_buttons = [types.InlineKeyboardButton(text='📁 '+folder, callback_data=folder[:45]) for folder in dir_ls]
-        files_buttons = [types.InlineKeyboardButton(text='💾 '+filee, callback_data=filee[:45]) for filee in files_ls]
+        files_buttons = [types.InlineKeyboardButton(text='💾 '+filee, callback_data=''.join([x for x in filee if x.isalpha()])[:45]) for filee in files_ls]
         item_inwindow_buttons = (dirs_buttons + files_buttons)[start_window:start_window+15]
     
         back_button = types.InlineKeyboardButton(text='⬅️ НАЗАД', callback_data='Back')
         exit_button = types.InlineKeyboardButton(text='❌ ВЫХОД', callback_data='Exit')
-        download_button = types.InlineKeyboardButton(text='📲 Скачать все!', callback_data='Download')
+        download_button = types.InlineKeyboardButton(text='📲 Скачать все!', callback_data='DownloadFolder')
         
         prev_page_button = types.InlineKeyboardButton(text='◀️ Пред.стр.', callback_data='PrevP')
         next_page_button = types.InlineKeyboardButton(text='▶️ След.стр.', callback_data='NextP')
@@ -286,11 +302,11 @@ def callback_inline(call):
         if len(dirs_buttons + files_buttons) > 15:
             markup.add(prev_page_button, next_page_button)
         bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text='/'+mess, reply_markup=markup)
-        
+    elif block_send_status:
+        block_send_status = False
 @logger.catch
 def echo_status(downloader_status, bot_status):
     while True:
-        
         if not downloader_status or not bot_status:
             mess = f"Внимание!!!\nСтатус потока скачивания: {downloader_status.is_alive()}\nСтатус потока бота: {bot_status.is_alive()}"
             logger.info(mess)
