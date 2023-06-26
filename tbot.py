@@ -28,13 +28,15 @@ root_dir = folder_music
 dir_ls = []
 files_ls = []
 load_dotenv(find_dotenv())
-bot = telebot.TeleBot(os.getenv('TELEGRAMM_TOKEN'))
+bot = telebot.TeleBot(os.getenv('TELEGRAMM_TOKEN_TEST'))
 download_queue = list()
 
 
 @bot.message_handler(commands=['start'])
 def start_message(message):
-    bot.send_message(message.chat.id, 'Привет, хочешь скачать музыку, аудиокниги, подкасты? /download')
+    mess = "Привет, хочешь скачать музыку, аудиокниги, подкасты? /download\
+        \nХочешь посмотреть скаченное? /files"
+    bot.send_message(message.chat.id, mess)
 
 
 
@@ -313,6 +315,7 @@ def echo_status(downloader_status, bot_status):
             mess = f"Внимание!!!\nСтатус потока скачивания: {downloader_status.is_alive()}\nСтатус потока бота: {bot_status.is_alive()}"
             logger.info(mess)
             time.sleep(600)
+            bot_thread.start()
         else:
             mess = f"\nСтатус потока скачивания: {downloader_status.is_alive()}\nСтатус потока бота: {bot_status.is_alive()}"
             logger.info(mess)
@@ -322,9 +325,8 @@ def echo_status(downloader_status, bot_status):
 if __name__ == '__main__':
     download_monitor_thread = threading.Thread(target=download_monitor)
     download_monitor_thread.start() # запуск потока скачивания медиафайлов
-    bot_thread = threading.Thread(target=bot.polling, kwargs={'none_stop': True})
+    bot_thread = threading.Thread(target=bot.infinity_polling, kwargs={'skip_pending':True})
     bot_thread.start() # запуск бота в отдельном потоке
-    
     echo_status_thread = threading.Thread(target=echo_status, kwargs={
         'downloader_status': download_monitor_thread,
         'bot_status': bot_thread})
