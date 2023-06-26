@@ -313,7 +313,7 @@ def echo_status(downloader_status, bot_status):
     while True:
         if not downloader_status or not bot_status:
             mess = f"Внимание!!!\nСтатус потока скачивания: {downloader_status.is_alive()}\nСтатус потока бота: {bot_status.is_alive()}"
-            logger.info(mess)
+            logger.error(mess)
             time.sleep(600)
             bot_thread.start()
         else:
