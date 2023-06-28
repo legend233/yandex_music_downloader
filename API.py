@@ -171,13 +171,16 @@ def download_book(album_id):
     info_book = {}
 
     for i in range(len(s['title'])):
-        if s['title'][i] in ',.-:<>;':
+        if s['title'][i] in '.—':
             info_book['author'] = s['title'][:i].strip()
             if s['version']:
-                info_book['book_title'] = s['title'][i+1:].strip() +' '+ s['version']
+                info_book['book_title'] = s['title'][i+1:].strip() +' ('+ s['version']+')'
             else:
                 info_book['book_title'] = s['title'][i+1:].strip()
             break
+        else:
+            info_book['author'] = "Сборники"
+            info_book['book_title'] = s['title']
 
     info_book['artists'] = ", ".join([x['name'] for x in s['artists']])
     info_book['cover_url'] = 'https://' + s['cover_uri'].replace('%%', '1000x1000')
@@ -186,7 +189,8 @@ def download_book(album_id):
         info_book['labels'] = s['labels'][0]['name']
     info_book['description'] = s['description']
     
-    
+    author_echo = f"Author: {info_book['author']}"
+    logger.info(author_echo) # вывод в лог
     book_echo = f"Book ID: {album_id} / Book title - {info_book['book_title']}"
     logger.info(book_echo)  # вывод в лог
     
