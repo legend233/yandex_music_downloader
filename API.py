@@ -195,7 +195,11 @@ def download_book(album_id):
     logger.info(book_echo)  # вывод в лог
     
     folder_author = f"{folder_audiobooks}/{info_book['author']}"
-    folder_book = f"{folder_author}/{''.join([ _ for _ in info_book['book_title'] if _ not in wrong_symbols])}/"
+    if len(info_book['book_title']) > 50:
+        info_book['short_book_title'] = info_book['book_title'][:50]+'...'
+        folder_book = f"{folder_author}/{''.join([ _ for _ in info_book['short_book_title'] if _ not in wrong_symbols])}/"
+    else:
+        folder_book = f"{folder_author}/{''.join([ _ for _ in info_book['book_title'] if _ not in wrong_symbols])}/"
     
     os.makedirs(os.path.dirname(folder_book), exist_ok=True)
     file_cover = f"{folder_book}/cover.jpg"
@@ -214,8 +218,11 @@ def download_book(album_id):
             
             part_echo = f"Start Download: ID: {part['id']} {part['title']} bitrate: {track_info[0]['bitrate_in_kbps']} {track_info[0]['direct_link']}"
             logger.info(part_echo)  # вывод в лог
-            
-            track_file = f"{folder_book}/{part['albums'][0]['track_position']['index']} - {''.join([ _ for _ in part['title'] if _ not in wrong_symbols])}.mp3"
+            part_name = ''.join([ _ for _ in part['title'] if _ not in wrong_symbols])
+            if len(part['title']) > 50:
+                track_file = f"{folder_book}/{part['albums'][0]['track_position']['index']} - {part_name[:20]+ '...'+ part_name[-20:]}.mp3"
+            else:
+                track_file = f"{folder_book}/{part['albums'][0]['track_position']['index']} - {part_name}.mp3"
             with open(track_file, 'wb') as f:
                 rec = requests.get(part_download_link)
                 f.write(rec.content)
