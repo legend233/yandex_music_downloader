@@ -229,6 +229,12 @@ def download_book(album_id):
                 track_file = f"{folder_book}/{part['albums'][0]['track_position']['index']} - {part_name[:20]+ '...'+ part_name[-20:]}.mp3"
             else:
                 track_file = f"{folder_book}/{part['albums'][0]['track_position']['index']} - {part_name}.mp3"
+            # проверяем существование трека на сервере
+            if os.path.exists(track_file):
+                track_echo_ok = "Track already exists. Continue."
+                logger.info(track_echo_ok)
+                continue
+            
             with open(track_file, 'wb') as f:
                 rec = requests.get(part_download_link)
                 f.write(rec.content)
@@ -303,6 +309,12 @@ def download_podcast(podcast_id):
             logger.info(part_echo)  # вывод в лог
 
             track_file = f"{folder_podcast}/#{part['albums'][0]['track_position']['volume']}-{part['albums'][0]['track_position']['index']} - {''.join([_ for _ in part['title'] if _ not in wrong_symbols])}.mp3"
+            # проверяем существование трека на сервере
+            if os.path.exists(track_file):
+                track_echo_ok = "Track already exists. Continue."
+                logger.info(track_echo_ok)
+                continue
+            
             with open(track_file, 'wb') as f:
                 rec = requests.get(part_download_link)
                 f.write(rec.content)
