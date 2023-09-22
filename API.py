@@ -114,6 +114,12 @@ def download_album(album_id):
             disk_folder = f"{album_folder}/Disk {info['volume_number']}"
             os.makedirs(os.path.dirname(f"{disk_folder}/"), exist_ok=True)
             track_file = f"{disk_folder}/{info['track_position']} - {''.join([ _ for _ in info['title'] if _ not in wrong_symbols])}.mp3"
+            # проверяем существование трека на сервере
+            if os.path.exists(track_file):
+                track_echo_ok = "Track already exists. Continue."
+                logger.info(track_echo_ok)
+                continue
+
             client.request.download(
                 url=track_info[0]['direct_link'],
                 filename=track_file
@@ -121,10 +127,10 @@ def download_album(album_id):
             track_echo_ok = "Track downloaded. Start write tag's."
             logger.info(track_echo_ok)  # вывод в лог
 
-            #начинаем закачивать тэги в трек
+            # начинаем закачивать тэги в трек
             mp3 = music_tag.load_file(track_file)
             mp3['tracktitle'] = info['title']
-            if album['version'] != None:
+            if album['version'] is not None:
                 mp3['album'] = info['album'] + ' ' + album['version']
             else:
                 mp3['album'] = info['album']
@@ -134,7 +140,7 @@ def download_album(album_id):
             mp3['totaltracks'] = info['total_track']
             mp3['genre'] = info['genre']
             mp3['Year'] = info['album_year']
-            if tag_info['version'] != None:
+            if tag_info['version'] is not None:
                 mp3['comment'] = f"{tag_info['version']} / Release date {info['album_year']}"
             else:
                 mp3['comment'] = f"Release date {info['album_year']}"
