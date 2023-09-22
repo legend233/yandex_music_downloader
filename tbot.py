@@ -206,7 +206,7 @@ def what_files(message):
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback_inline(call):
-    '''обработчик команды files. Отображает файловый менеджер с возможностью скачивать.'''
+    """обработчик команды files. Отображает файловый менеджер с возможностью скачивать."""
     global cur_dir
     global root_dir
     global dir_ls
