@@ -15,18 +15,29 @@ from API import (
     folder_audiobooks,
     get_podcast_info,
     download_podcast,
+    folder_podcasts
 )
 from dotenv import load_dotenv, find_dotenv
 import threading
+from loguru import logger
+import shutil
 
-
+start_window = 0
+cur_dir = folder_music
+root_dir = folder_music
+dir_ls = []
+files_ls = []
 load_dotenv(find_dotenv())
 bot = telebot.TeleBot(os.getenv('TELEGRAMM_TOKEN'))
 download_queue = list()
 
+
 @bot.message_handler(commands=['start'])
 def start_message(message):
-    bot.send_message(message.chat.id, 'Привет, хочешь скачать музыку или аудиокниги? /download')
+    mess = "Привет, хочешь скачать музыку, аудиокниги, подкасты? /download\
+        \nХочешь посмотреть скаченное? /files"
+    bot.send_message(message.chat.id, mess)
+
 
 
 @bot.message_handler(commands=['download'])
@@ -180,9 +191,144 @@ def download_monitor():
             download_queue.pop(0)
             bot.send_message(data[2], f"Всего осталось в очереди: {len(download_queue)} задачи")
 
+
+@bot.message_handler(commands=['files'])
+def what_files(message):
+    start_window = 0
+    markup = types.InlineKeyboardMarkup()
+    item1 = types.InlineKeyboardButton(text='Музыка', callback_data='files_music')
+    item2 = types.InlineKeyboardButton(text='Аудиокнига', callback_data='files_book')
+    item3 = types.InlineKeyboardButton(text='Подкаст', callback_data='files_podcast')
+    markup.add(item1, item2, item3)
+    msg = bot.send_message(message.chat.id, 'Какие файлы тебе нужны?', reply_markup=markup)
+    logger.info(f"Пользователь {message.chat.id} открыл инлайн меню просмотра файлов")
+
+
+@bot.callback_query_handler(func=lambda call: True)
+def callback_inline(call):
+    """обработчик команды files. Отображает файловый менеджер с возможностью скачивать."""
+    global cur_dir
+    global root_dir
+    global dir_ls
+    global files_ls
+    global start_window
+    block_send_status = False
+    if call.data == 'Exit':
+        block_send_status = True
+        bot.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
+        bot.send_message(call.message.chat.id, "Не хочешь... Как хочешь!", reply_markup=None)
+        logger.info(f"Пользователь {call.message.chat.id} закрыл инлайн меню просмотра файлов")
+    elif call.data == 'DownloadFolder':
+        block_send_status = True
+        if os.path.abspath(cur_dir) != os.path.abspath(root_dir):
+            send_temp_file = root_dir + cur_dir[cur_dir.rfind('/'):]
+            shutil.make_archive(send_temp_file, 'zip', cur_dir)
+            try:
+                with open(f'{send_temp_file}.zip', 'rb') as f:
+                    bot.send_document(call.message.chat.id, f)
+                logger.info(f"Пользователь {call.message.chat.id} скачал архив с содержимим каталога {cur_dir}")
+            except telebot.apihelper.ApiTelegramException:
+                bot.send_message(call.message.chat.id, "сработало ограничение в 50 мб")
+                logger.info(f"Пользователь {call.message.chat.id} не смог скачать архив с содержимим каталога {cur_dir}. Сработало ограничение в 50 мб")
+            finally:
+                os.remove(path=f'{send_temp_file}.zip')
+        else:
+            bot.send_message(call.message.chat.id, "Нельзя качать в корневом каталоге!", reply_markup=None)
+
+    else:
+        if call.data == 'files_music':
+            cur_dir = folder_music
+            root_dir = folder_music
+            
+        elif call.data == "files_book":
+            cur_dir = folder_audiobooks
+            root_dir = folder_audiobooks
+            
+        elif call.data == "files_podcast":
+            cur_dir = folder_podcasts
+            root_dir = folder_podcasts
+
+        elif call.data == 'Back':
+            start_window = 0
+            if os.path.abspath(cur_dir) != os.path.abspath(root_dir):
+                cur_dir = os.path.join(cur_dir, '..')
+            else:
+                bot.send_message(call.message.chat.id, "Ты в корневом каталоге! Выше нельзя", reply_markup=None)
+        
+        elif call.data == 'PrevP':
+            start_window -= 15
+            if start_window < 0:
+                start_window = 0
+        elif call.data == 'NextP':
+            if start_window + 15 < len(dir_ls + files_ls):
+                start_window += 15
+            else:
+                bot.send_message(call.message.chat.id, "Нет больше файлов", reply_markup=None)
+
+        elif call.data in [''.join([y for y in x if y.isalnum()])[:15] for x in dir_ls]:
+            for _ in dir_ls:
+                if call.data == ''.join([y for y in _ if y.isalnum()])[:15]:
+                    cur_dir = os.path.join(cur_dir, _)
+            start_window = 0
+
+        elif call.data in [''.join([y for y in x if y.isalnum()])[:15] for x in files_ls]:
+            block_send_status = True
+            for _ in files_ls:
+                if call.data == ''.join([y for y in _ if y.isalnum()])[:15]:
+                    send_file = cur_dir + '/' + _
+                    print(send_file)
+
+            try:
+                with open(f'{send_file}', 'rb') as f:
+                    bot.send_document(call.message.chat.id, f)
+                logger.info(f"File {send_file} sended!!!")
+            except telebot.apihelper.ApiTelegramException:
+                bot.send_message(call.message.chat.id, "сработало ограничение в 50 мб")
+                logger.error(f"сработало ограничение в 50 мб: {send_file} > 50 мб")
+
+    if not block_send_status:
+        dir_ls = sorted([folder for folder in os.listdir(cur_dir) if os.path.isdir(cur_dir+'/'+folder)])
+        files_ls = sorted([filee for filee in os.listdir(cur_dir) if os.path.isfile(cur_dir+'/'+filee)])
+        mess = os.path.abspath(cur_dir).replace(os.path.abspath(root_dir), '') 
+        markup = types.InlineKeyboardMarkup()
+        dirs_buttons = [types.InlineKeyboardButton(text='📁 '+folder, callback_data=''.join([x for x in folder if x.isalnum()])[:15]) for folder in dir_ls]
+        files_buttons = [types.InlineKeyboardButton(text='💾 '+filee, callback_data=''.join([x for x in filee if x.isalnum()])[:15]) for filee in files_ls]
+        item_inwindow_buttons = (dirs_buttons + files_buttons)[start_window:start_window+15]
+    
+        back_button = types.InlineKeyboardButton(text='⬅️ НАЗАД', callback_data='Back')
+        exit_button = types.InlineKeyboardButton(text='❌ ВЫХОД', callback_data='Exit')
+        download_button = types.InlineKeyboardButton(text='📲 Скачать все!', callback_data='DownloadFolder')
+        
+        prev_page_button = types.InlineKeyboardButton(text='◀️ Пред.стр.', callback_data='PrevP')
+        next_page_button = types.InlineKeyboardButton(text='▶️ След.стр.', callback_data='NextP')
+        
+        markup.add(download_button, back_button, exit_button, *item_inwindow_buttons)
+        if len(dirs_buttons + files_buttons) > 15:
+            markup.add(prev_page_button, next_page_button)
+        bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text='/'+mess, reply_markup=markup)
+    elif block_send_status:
+        block_send_status = False
+@logger.catch
+def echo_status(downloader_status, bot_status):
+    while True:
+        if not downloader_status or not bot_status:
+            mess = f"Внимание!!!\nСтатус потока скачивания: {downloader_status.is_alive()}\nСтатус потока бота: {bot_status.is_alive()}"
+            logger.error(mess)
+            time.sleep(600)
+            bot_thread.start()
+        else:
+            mess = f"\nСтатус потока скачивания: {downloader_status.is_alive()}\nСтатус потока бота: {bot_status.is_alive()}"
+            logger.info(mess)
+            time.sleep(3600)
+
+
 if __name__ == '__main__':
-    download_monitor_thread = threading.Thread(target=download_monitor, daemon=True)
+    download_monitor_thread = threading.Thread(target=download_monitor)
     download_monitor_thread.start() # запуск потока скачивания медиафайлов
-    bot_thread = threading.Thread(target=bot.polling, daemon=True, kwargs={'none_stop': True})
+    bot_thread = threading.Thread(target=bot.infinity_polling, kwargs={'skip_pending':True})
     bot_thread.start() # запуск бота в отдельном потоке
-    bot_thread.join() # ожидание завершения
+    echo_status_thread = threading.Thread(target=echo_status, kwargs={
+        'downloader_status': download_monitor_thread,
+        'bot_status': bot_thread})
+    echo_status_thread.start()
+    

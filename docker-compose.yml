@@ -11,4 +11,3 @@ services:
     environment:
       - TELEGRAMM_TOKEN=YOUR_TELEGRAMM_TOKEN
       - YA_TOKEN=YOUR_YA_TOKEN
-      

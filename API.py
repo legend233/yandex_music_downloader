@@ -114,6 +114,12 @@ def download_album(album_id):
             disk_folder = f"{album_folder}/Disk {info['volume_number']}"
             os.makedirs(os.path.dirname(f"{disk_folder}/"), exist_ok=True)
             track_file = f"{disk_folder}/{info['track_position']} - {''.join([ _ for _ in info['title'] if _ not in wrong_symbols])}.mp3"
+            # проверяем существование трека на сервере
+            if os.path.exists(track_file):
+                track_echo_ok = "Track already exists. Continue."
+                logger.info(track_echo_ok)
+                continue
+
             client.request.download(
                 url=track_info[0]['direct_link'],
                 filename=track_file
@@ -121,10 +127,10 @@ def download_album(album_id):
             track_echo_ok = "Track downloaded. Start write tag's."
             logger.info(track_echo_ok)  # вывод в лог
 
-            #начинаем закачивать тэги в трек
+            # начинаем закачивать тэги в трек
             mp3 = music_tag.load_file(track_file)
             mp3['tracktitle'] = info['title']
-            if album['version'] != None:
+            if album['version'] is not None:
                 mp3['album'] = info['album'] + ' ' + album['version']
             else:
                 mp3['album'] = info['album']
@@ -134,7 +140,7 @@ def download_album(album_id):
             mp3['totaltracks'] = info['total_track']
             mp3['genre'] = info['genre']
             mp3['Year'] = info['album_year']
-            if tag_info['version'] != None:
+            if tag_info['version'] is not None:
                 mp3['comment'] = f"{tag_info['version']} / Release date {info['album_year']}"
             else:
                 mp3['comment'] = f"Release date {info['album_year']}"
@@ -171,13 +177,16 @@ def download_book(album_id):
     info_book = {}
 
     for i in range(len(s['title'])):
-        if s['title'][i] in ',.-:<>;':
+        if s['title'][i] in '.—':
             info_book['author'] = s['title'][:i].strip()
             if s['version']:
-                info_book['book_title'] = s['title'][i+1:].strip() +' '+ s['version']
+                info_book['book_title'] = s['title'][i+1:].strip() +' ('+ s['version']+')'
             else:
                 info_book['book_title'] = s['title'][i+1:].strip()
             break
+        else:
+            info_book['author'] = "Сборники"
+            info_book['book_title'] = s['title']
 
     info_book['artists'] = ", ".join([x['name'] for x in s['artists']])
     info_book['cover_url'] = 'https://' + s['cover_uri'].replace('%%', '1000x1000')
@@ -186,12 +195,17 @@ def download_book(album_id):
         info_book['labels'] = s['labels'][0]['name']
     info_book['description'] = s['description']
     
-    
+    author_echo = f"Author: {info_book['author']}"
+    logger.info(author_echo) # вывод в лог
     book_echo = f"Book ID: {album_id} / Book title - {info_book['book_title']}"
     logger.info(book_echo)  # вывод в лог
     
     folder_author = f"{folder_audiobooks}/{info_book['author']}"
-    folder_book = f"{folder_author}/{''.join([ _ for _ in info_book['book_title'] if _ not in wrong_symbols])}/"
+    if len(info_book['book_title']) > 50:
+        info_book['short_book_title'] = info_book['book_title'][:50]+'...'
+        folder_book = f"{folder_author}/{''.join([ _ for _ in info_book['short_book_title'] if _ not in wrong_symbols])}/"
+    else:
+        folder_book = f"{folder_author}/{''.join([ _ for _ in info_book['book_title'] if _ not in wrong_symbols])}/"
     
     os.makedirs(os.path.dirname(folder_book), exist_ok=True)
     file_cover = f"{folder_book}/cover.jpg"
@@ -210,8 +224,17 @@ def download_book(album_id):
             
             part_echo = f"Start Download: ID: {part['id']} {part['title']} bitrate: {track_info[0]['bitrate_in_kbps']} {track_info[0]['direct_link']}"
             logger.info(part_echo)  # вывод в лог
+            part_name = ''.join([ _ for _ in part['title'] if _ not in wrong_symbols])
+            if len(part['title']) > 50:
+                track_file = f"{folder_book}/{part['albums'][0]['track_position']['index']} - {part_name[:20]+ '...'+ part_name[-20:]}.mp3"
+            else:
+                track_file = f"{folder_book}/{part['albums'][0]['track_position']['index']} - {part_name}.mp3"
+            # проверяем существование трека на сервере
+            if os.path.exists(track_file):
+                track_echo_ok = "Track already exists. Continue."
+                logger.info(track_echo_ok)
+                continue
             
-            track_file = f"{folder_book}/{part['albums'][0]['track_position']['index']} - {''.join([ _ for _ in part['title'] if _ not in wrong_symbols])}.mp3"
             with open(track_file, 'wb') as f:
                 rec = requests.get(part_download_link)
                 f.write(rec.content)
@@ -286,6 +309,12 @@ def download_podcast(podcast_id):
             logger.info(part_echo)  # вывод в лог
 
             track_file = f"{folder_podcast}/#{part['albums'][0]['track_position']['volume']}-{part['albums'][0]['track_position']['index']} - {''.join([_ for _ in part['title'] if _ not in wrong_symbols])}.mp3"
+            # проверяем существование трека на сервере
+            if os.path.exists(track_file):
+                track_echo_ok = "Track already exists. Continue."
+                logger.info(track_echo_ok)
+                continue
+            
             with open(track_file, 'wb') as f:
                 rec = requests.get(part_download_link)
                 f.write(rec.content)
