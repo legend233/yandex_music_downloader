@@ -1,14 +1,14 @@
 # Yandex music downloader
 ### Основано на:
-#### * MarshalX/yandex-music-api https://github.com/MarshalX/yandex-music-api
-#### * Telegram Bot API https://github.com/eternnoir/pyTelegramBotAPI
-#### * music-tag https://github.com/KristoforMaynard/music-tag
+#### * [MarshalX/yandex-music-api](https://github.com/MarshalX/yandex-music-api)
+#### * [Telegram Bot API](https://github.com/eternnoir/pyTelegramBotAPI)
+#### * [music-tag](https://github.com/KristoforMaynard/music-tag)
 
 Программа для скачивания через интерфейс телеграмм бота всей музыки артиста (по названию), альбома (по share ссылке), плейлиста (по share ссылке), сборника (по share ссылке), аудиокниги (по share ссылке), подкаст канала (по share ссылке) с вашего аккаунта на yandex.music.ru. Рекомендуется для работы в паре с медиосервером музыки (например plex) и аудиокниг/подкастов (например audiobookshelf).
 
 Для работы необходимо:
-1. Токен вашего яндекс аккаунта (https://github.com/MarshalX/yandex-music-api/discussions/513#discussioncomment-2729781)
-2. Токен телеграмм вашего бота (https://lifehacker.ru/kak-sozdat-bota-v-telegram/)
+1. [Токен вашего яндекс аккаунта](https://github.com/MarshalX/yandex-music-api/discussions/513#discussioncomment-2729781)
+2. [Токен телеграмм вашего бота](https://lifehacker.ru/kak-sozdat-bota-v-telegram/)
 
 # Установка
 ## Linux / MacOS / Windows
@@ -31,7 +31,7 @@ ______________
     6. python tbot.py
 
 ## Docker
-https://hub.docker.com/r/yuchoba/ya-download
+[yuchoba/ya-download](https://hub.docker.com/r/yuchoba/ya-download)
 # Использование
 1. Отправьте команду вашему телеграм боту:
 
