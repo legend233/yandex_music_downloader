@@ -1,6 +1,6 @@
 python-dotenv
 pyTelegramBotAPI
-git+https://github.com/MarshalX/yandex-music-api/@dev
+git+https://github.com/MarshalX/yandex-music-api/@main
 music-tag
 loguru
 requests
