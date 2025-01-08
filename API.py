@@ -1,3 +1,5 @@
+from time import sleep
+
 from yandex_music import Client
 from loguru import logger
 import requests
@@ -93,6 +95,7 @@ def download_album(album_id):
         n_volume += 1
 
         for track in disk:  # проходимся по каждому треку в диске
+            sleep(0.5)  # задержка между запросами
             track_info = client.tracks_download_info(track_id=track['id'], get_direct_links=True)  # узнаем информацию о треке
             track_info.sort(reverse=True, key=lambda key: key['bitrate_in_kbps'])
             track_echo = f"Start Download: ID: {track['id']} {track['title']} bitrate: {track_info[0]['bitrate_in_kbps']} {track_info[0]['direct_link']}"
