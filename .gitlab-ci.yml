@@ -1,0 +1,73 @@
+stages:
+  - tests
+  - build
+  - deploy
+
+default:
+  image: python:3.11
+  tags:
+    - docker-vm2
+
+
+.feature-rules:
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: never
+    - if: $CI_COMMIT_REF_NAME == "main"
+      when: never
+
+
+.build-push:
+  stage: build
+  image:
+   name: omio/gcr.io.kaniko-project.executor:debug-v1.6.0 # последняя версия Kaniko
+   entrypoint: [""]
+  variables:
+    DOCKER_CONFIG: /kaniko/.docker
+    IMAGE_TAG: $CI_COMMIT_REF_NAME
+  before_script:
+    - mkdir -p /kaniko/.docker
+    - echo "{\"auths\":{\"${CI_REGISTRY}\":{\"auth\":\"$(printf "%s:%s" "${CI_REGISTRY_USER}" "${CI_REGISTRY_PASSWORD}" | base64 | tr -d '\n')\"}}}" > /kaniko/.docker/config.json
+  script:
+    - /kaniko/executor --context $CI_PROJECT_DIR --dockerfile $CI_PROJECT_DIR/Dockerfile --destination $CI_REGISTRY_IMAGE:$IMAGE_TAG --cache=true --force
+    # --no-push можно добавить, чтобы собрать без отправки в registry
+
+
+python-tests:
+  stage: tests
+  image: python:3.11
+  script:
+    - echo "Running tests"
+  rules:
+    - !reference [.feature-rules, rules]
+    - if: $CI_PIPELINE_SOURCE != "merge_request_event"
+      when: always
+
+
+build-push-feature:
+  extends:
+    - .build-push
+    - .feature-rules
+  rules:
+    - !reference [.feature-rules, rules]
+    - if: $CI_PIPELINE_SOURCE != "merge_request_event"
+      when: manual
+
+
+build-push-master:
+  extends:
+    - .build-push
+  variables:
+    IMAGE_TAG: latest
+  rules:
+    - if: $CI_COMMIT_REF_NAME == "main"
+
+
+build-push-tag:
+  extends:
+    - .build-push
+  variables:
+    IMAGE_TAG: $CI_COMMIT_TAG
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: manual
