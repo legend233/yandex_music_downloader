@@ -13,11 +13,11 @@
 # Установка
 ## Linux / MacOS / Windows
     1. запустить git bush // для Windows
-    1. запустить терминал // для Linux/MacOS
-    2. git clone 'THIS_PROJECT'
-    3. cd yandex_music_downloader
-    4. pip install -r requirements.txt
-    5. nano .env
+    2. запустить терминал // для Linux/MacOS
+    3. git clone 'THIS_PROJECT'
+    4. cd yandex_music_downloader
+    5. pip install -r requirements.txt
+    6. nano .env
 ______________ 
 #### .env
 
@@ -28,7 +28,7 @@ ______________
     DOWNLOAD_PATH_PODCASTS=YOUR_DOWNLOAD_PATH
 ______________
 
-    6. python tbot.py
+    7. python tbot.py
 
 ## Docker
 [yuchoba/ya-download](https://hub.docker.com/r/yuchoba/ya-download)
