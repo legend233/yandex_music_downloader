@@ -1,3 +1,5 @@
+from time import sleep
+
 from yandex_music import Client
 from loguru import logger
 import requests
@@ -11,35 +13,38 @@ client.init()
 folder_music = os.getenv('DOWNLOAD_PATH_MUSIC')
 folder_audiobooks = os.getenv('DOWNLOAD_PATH_BOOKS')
 folder_podcasts = os.getenv('DOWNLOAD_PATH_PODCASTS')
-wrong_symbols = r"#<$+%>!`&*‘|?{}“=>/:\@" # спецсимволы которые негативно влияют на создание каталогов и файлов
+wrong_symbols = r"#<$+%>!`&*‘|?{}“=>/:\@"  # спецсимволы которые негативно влияют на создание каталогов и файлов
 # настройки логирования
 logger.add(f"{folder_music}/log.log",
            rotation='00:00', retention='1 week', compression="zip",
            format="{time: DD-MM-YYYY HH:mm:ss} | {level} | {message}",
            )
+
+
 @logger.catch
 def search_and_download_artist(search: str):
     """Ищем лучший результат по запросу артиста и скачиваем все его песни в папку download с разбивкой по альбомам"""
 
     try:
-        search_result = client.search(search, type_="artist", page=0, nocorrect=False) # поиск
+        search_result = client.search(search, type_="artist", page=0, nocorrect=False)  # поиск
         artist_id = search_result['artists']['results'][0]['id']
         artist_name = search_result['artists']['results'][0]['name']
-    except:
+    except Exception:
         print('No results! You sure?')
         return f'Твой запрос: {search} не найден.'
 
-    direkt_albums_count = search_result['artists']['results'][0]['counts']['direct_albums']
-    artist_echo = f"Start download: Artist ID: {artist_id} / Artist name: {artist_name} / Direct albums: {direkt_albums_count}" # вывод информации о артисте информации по артисту
-    logger.info(artist_echo) # вывод в лог
+    direct_albums_count = search_result['artists']['results'][0]['counts']['direct_albums']
+    artist_echo = f"Start download: Artist ID: {artist_id} / Artist name: {artist_name} / Direct albums: {direct_albums_count}"  # вывод информации о артисте информации по артисту
+    logger.info(artist_echo)  # вывод в лог
     # находим список альбомов артиста с информацией
-    direkt_albums = client.artistsDirectAlbums(artist_id=artist_id, page_size=1000)
+    direct_albums = client.artistsDirectAlbums(artist_id=artist_id, page_size=1000)
     # проходимся по каждому альбому
-    for album in direkt_albums:
+    for album in direct_albums:
         # проходимся по каждому диску в альбоме и загружаем его в папку
         download_album(album['id'])
 
-    return f"Успешно скачал артиста: {artist_name} с его {direkt_albums_count} альбомами."
+    return f"Успешно скачал артиста: {artist_name} с его {direct_albums_count} альбомами."
+
 
 @logger.catch
 def get_album_info(album_id):
@@ -48,13 +53,14 @@ def get_album_info(album_id):
     return f"Альбом: {album['title']}\nартист:{', '. join([art['name'] for art in album['artists']])} \
             \nколичество треков: {album['track_count']}"
 
+
 @logger.catch
 def download_album(album_id):
-    "Скачиваем альбом"
+    """Скачиваем альбом"""
     album = client.albumsWithTracks(album_id=album_id)
     album_echo = f"Album ID: {album['id']} / Album title - {album['title']}"
-    logger.info(album_echo) # вывод в лог
-    #создаем папку для альбома
+    logger.info(album_echo)  # вывод в лог
+    # создаем папку для альбома
     if album['artists'][0]['various']:
         album_folder = f"{folder_music}/Various artist/{album['title']} ({album['year']})"
     else:
@@ -72,26 +78,28 @@ def download_album(album_id):
 
         album_folder = f"{artist_folder}/{''.join([_ for _ in album['title'] if _ not in wrong_symbols])} ({album['year']})"
 
-    os.makedirs(os.path.dirname(f"{album_folder}/"),exist_ok=True)
-    album_cover_pic = f"{album_folder}/cover.jpg"
+    os.makedirs(os.path.dirname(f"{album_folder}/"), exist_ok=True)
+    album_cover_pic_path = f"{album_folder}/cover.jpg"
     # качаем обложку альбома
-    with open(album_cover_pic, 'wb') as f:
+    with open(album_cover_pic_path, 'wb') as f:
         rec = requests.get('http://' + album['cover_uri'].replace('%%', '1000x1000'))
-        f.write(rec.content)
+        album_cover = rec.content
+        f.write(album_cover)
 
     # проходимся по каждому диску в альбоме
 
     n_volume = 1
     for disk in album['volumes']:
         disk_echo = f"Start download: Volume №: {n_volume} из {len(album['volumes'])}"
-        logger.info(disk_echo) # вывод в лог
+        logger.info(disk_echo)  # вывод в лог
         n_volume += 1
 
-        for track in disk: # проходимся по каждому треку в диске
-            track_info = client.tracks_download_info(track_id=track['id'], get_direct_links=True) # узнаем информацию о треке
+        for track in disk:  # проходимся по каждому треку в диске
+            sleep(0.5)  # задержка между запросами
+            track_info = client.tracks_download_info(track_id=track['id'], get_direct_links=True)  # узнаем информацию о треке
             track_info.sort(reverse=True, key=lambda key: key['bitrate_in_kbps'])
             track_echo = f"Start Download: ID: {track['id']} {track['title']} bitrate: {track_info[0]['bitrate_in_kbps']} {track_info[0]['direct_link']}"
-            logger.info(track_echo) # вывод в лог
+            logger.info(track_echo)  # вывод в лог
             tag_info = client.tracks(track['id'])[0]
             info = {
                 'title': tag_info['title'],
@@ -148,14 +156,16 @@ def download_album(album_id):
             mp3['album_artist'] = info['album_artist']
             try:
                 lyrics = client.tracks_lyrics(track_id=track['id'], format='TEXT').fetch_lyrics()
-            except:
+            except Exception:
                 lyrics = False
             if lyrics:
                 with open(track_file.replace('.mp3', '.txt'), 'w', encoding='UTF8') as text_song:
                     text_song.write(lyrics)
                 mp3['lyrics'] = lyrics
-            with open(album_cover_pic, 'rb') as img_in:               #ложим картинку в тег "artwork"
-                mp3['artwork'] = img_in.read()
+            try:
+                mp3['artwork'] = album_cover
+            except TypeError as e:
+                logger.error(f"TypeError excepted with message: {e}")
 
             mp3.save()
             tags_echo = "Tag's is writed"
@@ -196,35 +206,36 @@ def download_book(album_id):
     info_book['description'] = s['description']
     
     author_echo = f"Author: {info_book['author']}"
-    logger.info(author_echo) # вывод в лог
+    logger.info(author_echo)  # вывод в лог
     book_echo = f"Book ID: {album_id} / Book title - {info_book['book_title']}"
     logger.info(book_echo)  # вывод в лог
     
     folder_author = f"{folder_audiobooks}/{info_book['author']}"
     if len(info_book['book_title']) > 50:
         info_book['short_book_title'] = info_book['book_title'][:50]+'...'
-        folder_book = f"{folder_author}/{''.join([ _ for _ in info_book['short_book_title'] if _ not in wrong_symbols])}/"
+        folder_book = f"{folder_author}/{''.join([ _ for _ in info_book['short_book_title'] if _ not in wrong_symbols])}"
     else:
-        folder_book = f"{folder_author}/{''.join([ _ for _ in info_book['book_title'] if _ not in wrong_symbols])}/"
+        folder_book = f"{folder_author}/{''.join([ _ for _ in info_book['book_title'] if _ not in wrong_symbols])}"
     
-    os.makedirs(os.path.dirname(folder_book), exist_ok=True)
+    os.makedirs(os.path.dirname(folder_book + "/"), exist_ok=True)
     file_cover = f"{folder_book}/cover.jpg"
+    rec = requests.get(info_book['cover_url'])
+    cover_book = rec.content
     with open(file_cover, 'wb') as f:
-        rec = requests.get(info_book['cover_url'])
-        f.write(rec.content)
+        f.write(cover_book)
 
     volumes = s['volumes']
     for volume in volumes:
         for part in volume:
             # начинаем закачивать треки
 
-            track_info = client.tracks_download_info(track_id=part['id'], get_direct_links=True) # узнаем информацию о треке 
+            track_info = client.tracks_download_info(track_id=part['id'], get_direct_links=True)  # узнаем информацию о треке
             track_info.sort(reverse=True, key=lambda key: key['bitrate_in_kbps'])
             part_download_link = track_info[0]['direct_link']
             
             part_echo = f"Start Download: ID: {part['id']} {part['title']} bitrate: {track_info[0]['bitrate_in_kbps']} {track_info[0]['direct_link']}"
             logger.info(part_echo)  # вывод в лог
-            part_name = ''.join([ _ for _ in part['title'] if _ not in wrong_symbols])
+            part_name = ''.join([_ for _ in part['title'] if _ not in wrong_symbols])
             if len(part['title']) > 50:
                 track_file = f"{folder_book}/{part['albums'][0]['track_position']['index']} - {part_name[:20]+ '...'+ part_name[-20:]}.mp3"
             else:
@@ -242,7 +253,7 @@ def download_book(album_id):
             track_echo_ok = "Track downloaded. Start write tag's."
             logger.info(track_echo_ok)  # вывод в лог
 
-            #начинаем закачивать тэги в трек
+            # начинаем закачивать тэги в трек
             mp3 = music_tag.load_file(track_file)
             mp3['tracktitle'] = part['title']
             mp3['album'] = info_book['book_title']
@@ -254,10 +265,12 @@ def download_book(album_id):
             mp3['artist'] = info_book['artists']
             mp3['album_artist'] = info_book['artists']
             mp3['comment'] = info_book['description']
-            with open(file_cover, 'rb') as img_in:   #ложим картинку в тег "artwork"
-                mp3['artwork'] = img_in.read()
+            try:
+                mp3['artwork'] = cover_book
+            except TypeError as e:
+                logger.error(f"TypeError excepted with message: {e}")
 
-            mp3.save() # сохраняем тэги в mp3
+            mp3.save()  # сохраняем тэги в mp3
             tags_echo = "Tag's is writed"
             logger.info(tags_echo)  # вывод в лог
     return f"Успешно скачал аудиокнигу: {info_book['book_title']} из {info_book['parts']} частей"
@@ -273,7 +286,7 @@ def get_podcast_info(podcast_id):
 @logger.catch
 def download_podcast(podcast_id):
     s = client.albumsWithTracks(album_id=podcast_id)
-    info_podcast = {}
+    info_podcast = dict()
     info_podcast['title'] = s['title']
     info_podcast['cover_url'] = 'https://' + s['cover_uri'].replace('%%', '1000x1000')
     info_podcast['tracks'] = s['track_count']
@@ -290,8 +303,9 @@ def download_podcast(podcast_id):
     file_description = f"{folder_podcast}info.txt"
 
     with open(file_cover, 'wb') as f:
-        rec = requests.get(info_podcast['cover_url']) 
-        f.write(rec.content) # записываем картинку обложки
+        rec = requests.get(info_podcast['cover_url'])
+        cover_album = rec.content
+        f.write(cover_album)  # записываем картинку обложки
 
     with open(file_description, 'w') as f:
         f.write(info_podcast['description']) 
@@ -332,9 +346,10 @@ def download_podcast(podcast_id):
             mp3['artist'] = info_podcast['title']
             mp3['album_artist'] = info_podcast['title']
             mp3['comment'] = part['short_description']
-
-            with open(file_cover, 'rb') as img_in:  # ложим картинку в тег "artwork"
-                mp3['artwork'] = img_in.read()
+            try:
+                mp3['artwork'] = cover_album
+            except TypeError as e:
+                logger.error(f"TypeError excepted with message: {e}")
 
             mp3.save()  # сохраняем тэги в mp3
             tags_echo = "Tag's is writed"
