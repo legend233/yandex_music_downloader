@@ -3,7 +3,7 @@
 import time
 import telebot
 import os
-from telebot import types
+from telebot import types, apihelper
 from API import (
     send_search_request_and_print_result,
     search_and_download_artist,
@@ -28,6 +28,12 @@ root_dir = folder_music
 dir_ls = []
 files_ls = []
 load_dotenv(find_dotenv())
+# Настройка прокси для Telegram API (опционально).
+# Если PROXY_URL не задан (пусто) — бот работает напрямую.
+# Формат: socks5://user:pass@host:port
+proxy_url = os.getenv('PROXY_URL')
+if proxy_url:
+    apihelper.proxy = {'https': proxy_url}
 bot = telebot.TeleBot(os.getenv('TELEGRAMM_TOKEN'))
 download_queue = list()
 
