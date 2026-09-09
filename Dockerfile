@@ -8,7 +8,8 @@ RUN ["mkdir", "/podcasts"]
 ENV DOWNLOAD_PATH_MUSIC="/music"
 ENV DOWNLOAD_PATH_BOOKS="/books"
 ENV DOWNLOAD_PATH_PODCASTS="/podcasts"
-ENV PROXY_URL=""
+ENV YA_PROXY_URL=""
+ENV TELEGRAM_PROXY_URL=""
 WORKDIR /app
 COPY ./API.py .
 COPY ./tbot.py .
