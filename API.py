@@ -1,6 +1,7 @@
 from time import sleep
 
 from yandex_music import Client
+from yandex_music.utils.request import Request
 from loguru import logger
 import requests
 import os
@@ -8,7 +9,15 @@ import music_tag
 from dotenv import load_dotenv, find_dotenv
 
 load_dotenv(find_dotenv())
-client = Client(token=os.getenv('YA_TOKEN'))
+# Настройка прокси для Yandex Music API и загрузок (опционально).
+# Если YA_PROXY_URL не задан (пусто) — работаем напрямую.
+# Формат: socks5://user:pass@host:port
+proxy_url = os.getenv('YA_PROXY_URL')
+proxies = {'http': proxy_url, 'https': proxy_url} if proxy_url else None
+if proxy_url:
+    client = Client(token=os.getenv('YA_TOKEN'), request=Request(proxy_url=proxy_url))
+else:
+    client = Client(token=os.getenv('YA_TOKEN'))
 client.init()
 folder_music = os.getenv('DOWNLOAD_PATH_MUSIC')
 folder_audiobooks = os.getenv('DOWNLOAD_PATH_BOOKS')
@@ -73,7 +82,7 @@ def download_album(album_id):
 
         os.makedirs(os.path.dirname(f"{artist_folder}/"), exist_ok=True)
         with open(artist_cover_pic, 'wb') as f:  # качаем обложку артиста
-            rec = requests.get('http://' + artist_cover_link)
+            rec = requests.get('http://' + artist_cover_link, proxies=proxies)
             f.write(rec.content)
 
         album_folder = f"{artist_folder}/{''.join([_ for _ in album['title'] if _ not in wrong_symbols])} ({album['year']})"
@@ -82,7 +91,7 @@ def download_album(album_id):
     album_cover_pic_path = f"{album_folder}/cover.jpg"
     # качаем обложку альбома
     with open(album_cover_pic_path, 'wb') as f:
-        rec = requests.get('http://' + album['cover_uri'].replace('%%', '1000x1000'))
+        rec = requests.get('http://' + album['cover_uri'].replace('%%', '1000x1000'), proxies=proxies)
         album_cover = rec.content
         f.write(album_cover)
 
@@ -219,7 +228,7 @@ def download_book(album_id):
     
     os.makedirs(os.path.dirname(folder_book + "/"), exist_ok=True)
     file_cover = f"{folder_book}/cover.jpg"
-    rec = requests.get(info_book['cover_url'])
+    rec = requests.get(info_book['cover_url'], proxies=proxies)
     cover_book = rec.content
     with open(file_cover, 'wb') as f:
         f.write(cover_book)
@@ -247,7 +256,7 @@ def download_book(album_id):
                 continue
             
             with open(track_file, 'wb') as f:
-                rec = requests.get(part_download_link)
+                rec = requests.get(part_download_link, proxies=proxies)
                 f.write(rec.content)
             
             track_echo_ok = "Track downloaded. Start write tag's."
@@ -303,7 +312,7 @@ def download_podcast(podcast_id):
     file_description = f"{folder_podcast}info.txt"
 
     with open(file_cover, 'wb') as f:
-        rec = requests.get(info_podcast['cover_url'])
+        rec = requests.get(info_podcast['cover_url'], proxies=proxies)
         cover_album = rec.content
         f.write(cover_album)  # записываем картинку обложки
 
@@ -330,7 +339,7 @@ def download_podcast(podcast_id):
                 continue
             
             with open(track_file, 'wb') as f:
-                rec = requests.get(part_download_link)
+                rec = requests.get(part_download_link, proxies=proxies)
                 f.write(rec.content)
 
             track_echo_ok = "Track downloaded. Start write tag's."

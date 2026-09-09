@@ -29,9 +29,9 @@ dir_ls = []
 files_ls = []
 load_dotenv(find_dotenv())
 # Настройка прокси для Telegram API (опционально).
-# Если PROXY_URL не задан (пусто) — бот работает напрямую.
+# Если TELEGRAM_PROXY_URL не задан (пусто) — бот работает напрямую.
 # Формат: socks5://user:pass@host:port
-proxy_url = os.getenv('PROXY_URL')
+proxy_url = os.getenv('TELEGRAM_PROXY_URL')
 if proxy_url:
     apihelper.proxy = {'https': proxy_url}
 bot = telebot.TeleBot(os.getenv('TELEGRAMM_TOKEN'))
