@@ -13,6 +13,7 @@ ENV TELEGRAM_PROXY_URL=""
 WORKDIR /app
 COPY ./API.py .
 COPY ./tbot.py .
+COPY ./bot_support.py .
 COPY ./requirements.txt .
 RUN pip install -r requirements.txt
 

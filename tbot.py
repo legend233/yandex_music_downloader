@@ -1,340 +1,366 @@
-#!/usr/bin/python3
-# -*- coding: utf-8 -*-
-import time
-import telebot
+#!/usr/bin/env python3
+"""Single-user Telegram frontend. Importing this module never imports API."""
+
+import logging
 import os
-from telebot import types, apihelper
-from API import (
-    send_search_request_and_print_result,
-    search_and_download_artist,
-    download_album,
-    get_album_info,
-    folder_music,
-    download_book,
-    get_book_info,
-    folder_audiobooks,
-    get_podcast_info,
-    download_podcast,
-    folder_podcasts
-)
-from dotenv import load_dotenv, find_dotenv
+import secrets
 import threading
-from loguru import logger
-import shutil
+from dataclasses import dataclass, field
+from pathlib import Path
+from queue import Queue
+from tempfile import TemporaryDirectory
 
-start_window = 0
-cur_dir = folder_music
-root_dir = folder_music
-dir_ls = []
-files_ls = []
-load_dotenv(find_dotenv())
-# Настройка прокси для Telegram API (опционально).
-# Если TELEGRAM_PROXY_URL не задан (пусто) — бот работает напрямую.
-# Формат: socks5://user:pass@host:port
-proxy_url = os.getenv('TELEGRAM_PROXY_URL')
-if proxy_url:
-    apihelper.proxy = {'https': proxy_url}
-bot = telebot.TeleBot(os.getenv('TELEGRAMM_TOKEN'))
-download_queue = list()
+from bot_support import (PAGE_SIZE, archive_media, list_media, open_media,
+                         parse_media_url, validate_allowed_id)
+
+log = logging.getLogger(__name__)
+LABELS = {"artist": "🎤 Артист", "album": "💿 Альбом", "book": "📚 Книга", "podcast": "🎙 Подкаст"}
 
 
-@bot.message_handler(commands=['start'])
-def start_message(message):
-    mess = "Привет, хочешь скачать музыку, аудиокниги, подкасты? /download\
-        \nХочешь посмотреть скаченное? /files"
-    bot.send_message(message.chat.id, mess)
+@dataclass
+class Session:
+    mode: str = "idle"
+    token: str = ""
+    message_id: int | None = None
+    actions: dict = field(default_factory=dict)
+    kind: str = ""
+    pending: tuple | None = None
+    query: str = ""
+    search_page: int = 0
+    root: Path | None = None
+    directory: Path | None = None
+    file_page: int = 0
+    files: dict = field(default_factory=dict)
+
+    def invalidate(self):
+        self.token = ""
+        self.actions.clear()
+        self.message_id = None
 
 
+class Frontend:
+    def __init__(self, api, bot, allowed_id):
+        from telebot import types
+        self.types = types
+        self.api, self.bot = api, bot
+        self.allowed_id = validate_allowed_id(allowed_id)
+        self.sessions = {}
+        self.queue = Queue()
+        self.lock = threading.RLock()
+        self.worker = None
+        self.reply = types.ReplyKeyboardMarkup(resize_keyboard=True, is_persistent=True)
+        self.reply.row("📥 Скачать", "📂 Файлы")
 
-@bot.message_handler(commands=['download'])
-def download_command(message):
-    """
-    Обрабатывает команду 'download' для бота. Отображает клавиатуру ответа с вариантами
-    для выбора типа медиафайла для загрузки. 
+    def authorized(self, event):
+        return getattr(getattr(event, "from_user", None), "id", None) == self.allowed_id
 
-    Аргументы:
-    - message: объект сообщения, представляющий сообщение, отправленное пользователем.
+    def notify(self, chat, text):
+        try:
+            self.bot.send_message(chat, str(text)[:4000], parse_mode=None)
+        except Exception:
+            log.exception("Telegram notification failed")
 
-    Возвращает:
-    - None
-    """
-    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
-    item1 = types.KeyboardButton("Артиста")
-    item2 = types.KeyboardButton("Альбом")
-    item3 = types.KeyboardButton('Книгу')
-    item4 = types.KeyboardButton('Подкаст')
-    markup.add(item1, item2, item3, item4)
-    msg = bot.send_message(message.chat.id, 'Что будем качать?', reply_markup=markup)
-    bot.register_next_step_handler(msg, take_you_choise)
+    def start_worker(self):
+        if self.worker is None:
+            self.worker = threading.Thread(target=self.work, name="download-worker", daemon=True)
+            self.worker.start()
 
-
-def take_you_choise(message):
-    """Эта функция обрабатывает сообщение, запрашивает у пользователя дополнительную информацию в зависимости от текста сообщения и регистрирует обработчик следующего шага."""
-    if message.text == "Артиста":
-        msg = bot.send_message(message.chat.id, 'Напиши название артиста или группы')
-        bot.register_next_step_handler(msg, input_data_artist)
-    elif message.text == "Альбом":
-        msg = bot.send_message(message.chat.id, 'скинь ссылку на альбом')
-        bot.register_next_step_handler(msg, input_data_albom)
-    elif message.text == "Книгу":
-        msg = bot.send_message(message.chat.id, 'Кинь мне ссылку на книгу с яндекс-музыки')
-        bot.register_next_step_handler(msg, input_data_book)
-    elif message.text == "Подкаст":
-        msg = bot.send_message(message.chat.id, 'Кинь мне ссылку на подкаст с яндекс-музыки')
-        bot.register_next_step_handler(msg, input_data_podcast)
-
-
-def input_data_artist(message):
-    """
-    Обрабатывает сообщение, запрашивает у пользователя информацию о артисте.
-    """
-    try:
-        artist = send_search_request_and_print_result(message.text)
-        bot.send_message(message.chat.id, artist)
-        markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
-        item1 = types.KeyboardButton("Качаем!")
-        item2 = types.KeyboardButton("Отмена")
-        markup.add(item1, item2)
-        msg = bot.send_message(message.chat.id, 'Качаем музыку этого артиста?', reply_markup=markup)
-        artist_result = artist[artist.find('>>>') + 3:artist.rfind('<<<')].lower()
-        cont_type = 'Artist'
-        bot.register_next_step_handler(msg, download_from_input_data, cont_type, artist_result)
-    except:
-        bot.send_message(message.chat.id, f'Что-то пошло не так при поиске информации о артисте {artist}. Посмотри логи.')
-        with open(f'{folder_music}/log.log', 'rb') as file:
-            bot.send_document(message.chat.id, file)
-
-def input_data_albom(message):
-    """Обрабатывает сообщение, запрашивает у пользователя информацию о альбоме."""
-    try:
-        album_id = ''.join([x for x in message.text if x.isdigit()])
-        print('Album_id: ', album_id)
-        album_mess = get_album_info(album_id=album_id)
-        bot.send_message(message.chat.id, album_mess)
-        markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
-        item1 = types.KeyboardButton("Качаем!")
-        item2 = types.KeyboardButton("Отмена")
-        markup.add(item1, item2)
-        msg = bot.send_message(message.chat.id, 'Качаем этот альбом?', reply_markup=markup)
-        cont_type = 'Album'
-        bot.register_next_step_handler(msg, download_from_input_data, cont_type, album_id)
-    except:
-        bot.send_message(message.chat.id, 'Что-то пошло не так при поиске информации о альбоме. Посмотри логи.')
-        with open(f'{folder_music}/log.log', 'rb') as file:
-            bot.send_document(message.chat.id, file)
-
-
-def input_data_book(message):
-    """Обрабатывает сообщение, запрашивает у пользователя информацию о аудиокниге."""
-    try:
-        book_id = ''.join([x for x in message.text if x.isdigit()])
-        book_mess = get_book_info(album_id=book_id)
-        bot.send_message(message.chat.id, book_mess)
-        markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
-        item1 = types.KeyboardButton("Качаем!")
-        item2 = types.KeyboardButton("Отмена")
-        markup.add(item1, item2)
-        msg = bot.send_message(message.chat.id, 'Качаем эту аудиокнигу?', reply_markup=markup)
-        cont_type = 'Book'
-        bot.register_next_step_handler(msg, download_from_input_data, cont_type, book_id)
-    except:
-        bot.send_message(message.chat.id, 'Что-то пошло не так при поиске информации о аудиокниге. Посмотри логи.')
-        with open(f'{folder_music}/log.log', 'rb') as file:
-            bot.send_document(message.chat.id, file)
-
-
-def input_data_podcast(message):
-    """Обрабатывает сообщение, запрашивает у пользователя информацию о подкасте."""
-    try:
-        podcast_id = ''.join([x for x in message.text if x.isdigit()])
-        podcast_mess = get_podcast_info(podcast_id=podcast_id)
-        bot.send_message(message.chat.id, podcast_mess)
-        markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
-        item1 = types.KeyboardButton("Качаем!")
-        item2 = types.KeyboardButton("Отмена")
-        markup.add(item1, item2)
-        msg = bot.send_message(message.chat.id, 'Качаем этот подкаст?', reply_markup=markup)
-        cont_type = 'Podcast'
-        bot.register_next_step_handler(msg, download_from_input_data, cont_type, podcast_id)
-    except:
-        bot.send_message(message.chat.id, 'Что-то пошло не так при поиске информации о подкасте. Посмотри логи.')
-        with open(f'{folder_music}/log.log', 'rb') as file:
-            bot.send_document(message.chat.id, file)
-
-
-def download_from_input_data(message, *args):
-    """Добавляет закачку в очередь."""
-    try:
-        if message.text == 'Качаем!':
-            if args[0] == 'Artist':
-                download_queue.append((search_and_download_artist, args[1], message.chat.id))
-            elif args[0] == 'Album':
-                download_queue.append((download_album, args[1], message.chat.id))
-            elif args[0] == 'Book':
-                download_queue.append((download_book, args[1], message.chat.id))
-            elif args[0] == 'Podcast':
-                download_queue.append((download_podcast, args[1], message.chat.id))
-            bot.send_message(message.chat.id, f"Добавил закачку в очередь.\nВсего в очереди: {len(download_queue)} задачи")
-        else:
-            bot.send_message(message.chat.id, f"Не хочешь? Можешь скачать что-то другое.")
-    except:
-        bot.send_message(message.chat.id, "Что-то пошло не так при добавлении в очередь. Посмотри log")
-        with open(f'{folder_music}/log.log', 'rb') as file:
-            bot.send_document(message.chat.id, file)
-
-
-def download_monitor():
-    """Основной цикл скачивания."""
-    while True:
-        time.sleep(10)
-        if download_queue != []:
-            data = download_queue[0]
+    def work(self):
+        while True:
+            job = self.queue.get()
             try:
-                result = data[0](data[1])
-                bot.send_message(chat_id=data[2], text=result)
-            except:
-                bot.send_message(chat_id=data[2], text=f"Что-то пошло не так при скачивании ID:{data[1]}. Посмотри log")
-            download_queue.pop(0)
-            bot.send_message(data[2], f"Всего осталось в очереди: {len(download_queue)} задачи")
-
-
-@bot.message_handler(commands=['files'])
-def what_files(message):
-    start_window = 0
-    markup = types.InlineKeyboardMarkup()
-    item1 = types.InlineKeyboardButton(text='Музыка', callback_data='files_music')
-    item2 = types.InlineKeyboardButton(text='Аудиокнига', callback_data='files_book')
-    item3 = types.InlineKeyboardButton(text='Подкаст', callback_data='files_podcast')
-    markup.add(item1, item2, item3)
-    msg = bot.send_message(message.chat.id, 'Какие файлы тебе нужны?', reply_markup=markup)
-    logger.info(f"Пользователь {message.chat.id} открыл инлайн меню просмотра файлов")
-
-
-@bot.callback_query_handler(func=lambda call: True)
-def callback_inline(call):
-    """обработчик команды files. Отображает файловый менеджер с возможностью скачивать."""
-    global cur_dir
-    global root_dir
-    global dir_ls
-    global files_ls
-    global start_window
-    block_send_status = False
-    if call.data == 'Exit':
-        block_send_status = True
-        bot.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
-        bot.send_message(call.message.chat.id, "Не хочешь... Как хочешь!", reply_markup=None)
-        logger.info(f"Пользователь {call.message.chat.id} закрыл инлайн меню просмотра файлов")
-    elif call.data == 'DownloadFolder':
-        block_send_status = True
-        if os.path.abspath(cur_dir) != os.path.abspath(root_dir):
-            send_temp_file = root_dir + cur_dir[cur_dir.rfind('/'):]
-            shutil.make_archive(send_temp_file, 'zip', cur_dir)
-            try:
-                with open(f'{send_temp_file}.zip', 'rb') as f:
-                    bot.send_document(call.message.chat.id, f)
-                logger.info(f"Пользователь {call.message.chat.id} скачал архив с содержимим каталога {cur_dir}")
-            except telebot.apihelper.ApiTelegramException:
-                bot.send_message(call.message.chat.id, "сработало ограничение в 50 мб")
-                logger.info(f"Пользователь {call.message.chat.id} не смог скачать архив с содержимим каталога {cur_dir}. Сработало ограничение в 50 мб")
+                if job is None:  # shutdown sentinel, also useful for offline tests
+                    return
+                chat, kind, media_id = job
+                try:
+                    result = getattr(self.api, f"download_{kind}")(media_id)
+                    # Legacy API functions decorated with logger.catch return None on failure.
+                    if result is None:
+                        raise RuntimeError("Downloader returned no result")
+                except Exception:
+                    log.exception("Download failed: %s %s", kind, media_id)
+                    self.notify(chat, "❌ Не удалось выполнить загрузку. Попробуйте позже.")
+                else:
+                    self.notify(chat, result or "✅ Загрузка завершена.")
             finally:
-                os.remove(path=f'{send_temp_file}.zip')
-        else:
-            bot.send_message(call.message.chat.id, "Нельзя качать в корневом каталоге!", reply_markup=None)
+                self.queue.task_done()
 
-    else:
-        if call.data == 'files_music':
-            cur_dir = folder_music
-            root_dir = folder_music
-            
-        elif call.data == "files_book":
-            cur_dir = folder_audiobooks
-            root_dir = folder_audiobooks
-            
-        elif call.data == "files_podcast":
-            cur_dir = folder_podcasts
-            root_dir = folder_podcasts
+    def render(self, chat, state, text, buttons, footer_rows=()):
+        state.invalidate()
+        state.token = secrets.token_hex(8)
+        markup = self.types.InlineKeyboardMarkup(row_width=1)
+        for row in [[button] for button in buttons] + list(footer_rows):
+            row_buttons = []
+            for label, action, payload in row:
+                key = str(len(state.actions))
+                state.actions[key] = (action, payload)
+                row_buttons.append(self.types.InlineKeyboardButton(label[:100], callback_data=f"{state.token}:{key}"))
+            if row_buttons:
+                markup.row(*row_buttons)
+        try:
+            message = self.bot.send_message(chat, str(text)[:4000], reply_markup=markup, parse_mode=None)
+            state.message_id = message.message_id
+        except Exception:
+            state.invalidate()
+            raise
 
-        elif call.data == 'Back':
-            start_window = 0
-            if os.path.abspath(cur_dir) != os.path.abspath(root_dir):
-                cur_dir = os.path.join(cur_dir, '..')
-            else:
-                bot.send_message(call.message.chat.id, "Ты в корневом каталоге! Выше нельзя", reply_markup=None)
-        
-        elif call.data == 'PrevP':
-            start_window -= 15
-            if start_window < 0:
-                start_window = 0
-        elif call.data == 'NextP':
-            if start_window + 15 < len(dir_ls + files_ls):
-                start_window += 15
-            else:
-                bot.send_message(call.message.chat.id, "Нет больше файлов", reply_markup=None)
+    @staticmethod
+    def cancel_button():
+        return ("❌ Отмена", "cancel", None)
 
-        elif call.data in [''.join([y for y in x if y.isalnum()])[:15] for x in dir_ls]:
-            for _ in dir_ls:
-                if call.data == ''.join([y for y in _ if y.isalnum()])[:15]:
-                    cur_dir = os.path.join(cur_dir, _)
-            start_window = 0
+    def download_menu(self, chat, state):
+        state.mode = "menu"
+        state.pending = None
+        buttons = [(label + " по ссылке", "kind", kind) for kind, label in LABELS.items()]
+        buttons += [("🔎 Поиск артиста по имени", "search", None), self.cancel_button()]
+        self.render(chat, state, "📥 Что скачать? Выберите тип или поиск артиста.", buttons)
 
-        elif call.data in [''.join([y for y in x if y.isalnum()])[:15] for x in files_ls]:
-            block_send_status = True
-            for _ in files_ls:
-                if call.data == ''.join([y for y in _ if y.isalnum()])[:15]:
-                    send_file = cur_dir + '/' + _
-                    print(send_file)
+    def search_prompt(self, chat, state):
+        state.mode, state.pending = "search_input", None
+        self.render(chat, state, "🔎 Введите имя артиста или группы.", [self.cancel_button()])
 
+    def file_menu(self, chat, state):
+        state.mode, state.pending = "file_menu", None
+        self.render(chat, state, "📂 Выберите раздел:", [
+            ("🎵 Музыка", "root", "music"), ("📚 Книги", "root", "book"),
+            ("🎙 Подкасты", "root", "podcast"), self.cancel_button()])
+
+    def search_results(self, chat, state):
+        results = self.api.search_artists(state.query, page=state.search_page)
+        buttons = []
+        for artist in results:
+            media_id = str(artist["id"])
+            if media_id.isascii() and media_id.isdigit():
+                buttons.append((f"🎤 {artist['name']} · ID {media_id}", "artist", media_id))
+        navigation = []
+        if state.search_page:
+            navigation.append(("⬅️", "search_page", state.search_page - 1))
+        if results:
+            navigation.append(("➡️", "search_page", state.search_page + 1))
+        state.mode = "results"
+        self.render(chat, state, f"🔎 {state.query[:300]} — страница {state.search_page + 1}\n"
+                    + ("Выберите артиста:" if buttons and results else "Ничего не найдено."), buttons,
+                    footer_rows=[navigation, [("🔎 Другой запрос", "search", None)], [self.cancel_button()]])
+
+    def confirm(self, chat, state, kind, media_id):
+        info = getattr(self.api, f"get_{kind}_info")(media_id)
+        if not isinstance(info, str) or not info.strip():
+            raise RuntimeError("No media information returned")
+        state.mode, state.pending = "confirm", (kind, media_id)
+        self.render(chat, state, f"{str(info)[:3500]}\n\n{LABELS[kind]} · ID {media_id}\nДобавить в очередь?",
+                    [("✅ Скачать", "confirm", None), self.cancel_button()])
+
+    def files_page(self, chat, state):
+        entries = list_media(state.root, state.directory)
+        last = max(0, (len(entries) - 1) // PAGE_SIZE)
+        state.file_page = max(0, min(state.file_page, last))
+        start = state.file_page * PAGE_SIZE
+        state.files = {str(i): path for i, (path, _) in enumerate(entries[start:start + PAGE_SIZE])}
+        buttons = [(f"{'📁' if is_dir else '📄'} {path.name}", "file", str(i))
+                   for i, (path, is_dir) in enumerate(entries[start:start + PAGE_SIZE])]
+        navigation = []
+        actions = []
+        if state.directory != state.root:
+            navigation.append(("⬆️", "up", None))
+            actions.append(("📦 Скачать", "archive", None))
+        if state.file_page:
+            navigation.append(("⬅️", "file_page", state.file_page - 1))
+        if state.file_page < last:
+            navigation.append(("➡️", "file_page", state.file_page + 1))
+        navigation.append(("📂", "files", None))
+        actions.append(self.cancel_button())
+        state.mode = "files"
+        display = state.directory.relative_to(state.root).as_posix()
+        self.render(chat, state, f"📂 /{'' if display == '.' else display}\nСтраница {state.file_page + 1}/{last + 1}"
+                    + ("\nКаталог пуст." if not entries else ""), buttons,
+                    footer_rows=[navigation, actions])
+
+    def message(self, message):
+        if not self.authorized(message):
+            return
+        with self.lock:
+            chat = message.chat.id
+            key = (chat, message.from_user.id)
+            state = self.sessions.setdefault(key, Session())
+            text = getattr(message, "text", None) or ""
+            words = text.split(maxsplit=1)
+            command = words[0].split("@")[0] if words else ""
             try:
-                with open(f'{send_file}', 'rb') as f:
-                    bot.send_document(call.message.chat.id, f)
-                logger.info(f"File {send_file} sended!!!")
-            except telebot.apihelper.ApiTelegramException:
-                bot.send_message(call.message.chat.id, "сработало ограничение в 50 мб")
-                logger.error(f"сработало ограничение в 50 мб: {send_file} > 50 мб")
+                if command in {"/start", "/download", "/files", "/search", "/cancel"} or text in {"📥 Скачать", "📂 Файлы"}:
+                    state.invalidate()
+                    state.pending = None
+                    if command == "/start":
+                        state.mode = "idle"
+                        self.bot.send_message(
+                            chat,
+                            "🎵 Скачивайте музыку, книги и подкасты по ссылкам Яндекс Музыки.\n"
+                            "📥 /download — скачать\n📂 /files — просмотр файлов\n"
+                            "🔎 /search — поиск артиста по имени",
+                            reply_markup=self.reply,
+                        )
+                    elif command == "/files" or text == "📂 Файлы":
+                        self.file_menu(chat, state)
+                    elif command == "/search":
+                        self.search_prompt(chat, state)
+                    elif command == "/cancel":
+                        self.cancel(chat, state)
+                    else:
+                        self.download_menu(chat, state)
+                elif state.mode == "search_input":
+                    state.invalidate()
+                    if not text.strip() or text.startswith("/"):
+                        self.search_prompt(chat, state)
+                    else:
+                        state.query, state.search_page = text.strip()[:300], 0
+                        self.search_results(chat, state)
+                elif state.mode == "url_input":
+                    state.invalidate()
+                    try:
+                        media_id = parse_media_url(text, state.kind)
+                    except ValueError as error:
+                        self.render(chat, state, str(error), [self.cancel_button()])
+                        return
+                    self.confirm(chat, state, state.kind, media_id)
+                else:
+                    self.notify(chat, "Используйте /download, /search или /files.")
+            except Exception:
+                self.recover(chat, state)
 
-    if not block_send_status:
-        dir_ls = sorted([folder for folder in os.listdir(cur_dir) if os.path.isdir(cur_dir+'/'+folder)])
-        files_ls = sorted([filee for filee in os.listdir(cur_dir) if os.path.isfile(cur_dir+'/'+filee)])
-        mess = os.path.abspath(cur_dir).replace(os.path.abspath(root_dir), '') 
-        markup = types.InlineKeyboardMarkup()
-        dirs_buttons = [types.InlineKeyboardButton(text='📁 '+folder, callback_data=''.join([x for x in folder if x.isalnum()])[:15]) for folder in dir_ls]
-        files_buttons = [types.InlineKeyboardButton(text='💾 '+filee, callback_data=''.join([x for x in filee if x.isalnum()])[:15]) for filee in files_ls]
-        item_inwindow_buttons = (dirs_buttons + files_buttons)[start_window:start_window+15]
-    
-        back_button = types.InlineKeyboardButton(text='⬅️ НАЗАД', callback_data='Back')
-        exit_button = types.InlineKeyboardButton(text='❌ ВЫХОД', callback_data='Exit')
-        download_button = types.InlineKeyboardButton(text='📲 Скачать все!', callback_data='DownloadFolder')
-        
-        prev_page_button = types.InlineKeyboardButton(text='◀️ Пред.стр.', callback_data='PrevP')
-        next_page_button = types.InlineKeyboardButton(text='▶️ След.стр.', callback_data='NextP')
-        
-        markup.add(download_button, back_button, exit_button, *item_inwindow_buttons)
-        if len(dirs_buttons + files_buttons) > 15:
-            markup.add(prev_page_button, next_page_button)
-        bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text='/'+mess, reply_markup=markup)
-    elif block_send_status:
-        block_send_status = False
-@logger.catch
-def echo_status(downloader_status, bot_status):
-    while True:
-        if not downloader_status or not bot_status:
-            mess = f"Внимание!!!\nСтатус потока скачивания: {downloader_status.is_alive()}\nСтатус потока бота: {bot_status.is_alive()}"
-            logger.error(mess)
-            time.sleep(600)
-            bot_thread.start()
-        else:
-            mess = f"\nСтатус потока скачивания: {downloader_status.is_alive()}\nСтатус потока бота: {bot_status.is_alive()}"
-            logger.info(mess)
-            time.sleep(3600)
+    def cancel(self, chat, state):
+        state.mode, state.pending = "idle", None
+        self.render(chat, state, "❌ Действие отменено. Уже поставленные в очередь загрузки продолжатся.",
+                    [("📥 Скачать", "download", None), ("📂 Файлы", "files", None)])
+
+    def recover(self, chat, state):
+        log.exception("Frontend operation failed")
+        state.invalidate()
+        state.mode, state.pending = "idle", None
+        self.notify(chat, "❌ Не удалось выполнить действие. Проверьте доступность сервиса или файла и повторите /download, /search или /files.")
+
+    def callback(self, call):
+        if not self.authorized(call):
+            return
+        with self.lock:
+            message = getattr(call, "message", None)
+            if message is None:
+                return
+            chat = message.chat.id
+            state = self.sessions.get((chat, call.from_user.id))
+            token, sep, index = (getattr(call, "data", None) or "").partition(":")
+            if (not state or not sep or not state.token or token != state.token
+                    or message.message_id != state.message_id or index not in state.actions):
+                self.answer(call, "Кнопка устарела. Откройте меню заново.")
+                return
+            action, payload = state.actions[index]
+            state.invalidate()  # consume BEFORE queueing, network calls or further rendering
+            self.answer(call)
+            try:
+                self.dispatch(chat, state, action, payload)
+            except Exception:
+                self.recover(chat, state)
+
+    def answer(self, call, text=None):
+        try:
+            self.bot.answer_callback_query(call.id, text=text)
+        except Exception:
+            log.exception("Callback acknowledgement failed")
+
+    def dispatch(self, chat, state, action, payload):
+        if action == "cancel":
+            self.cancel(chat, state)
+        elif action == "download":
+            self.download_menu(chat, state)
+        elif action == "files":
+            self.file_menu(chat, state)
+        elif action == "search":
+            self.search_prompt(chat, state)
+        elif action == "kind":
+            state.kind, state.mode, state.pending = payload, "url_input", None
+            self.render(chat, state, f"{LABELS[payload]}: отправьте ссылку Яндекс Музыки.\n"
+                        "Треки и плейлисты не поддерживаются.", [self.cancel_button()])
+        elif action == "artist":
+            self.confirm(chat, state, "artist", payload)
+        elif action == "search_page":
+            state.search_page = payload
+            self.search_results(chat, state)
+        elif action == "confirm" and state.mode == "confirm" and state.pending:
+            kind, media_id = state.pending
+            state.pending, state.mode = None, "idle"
+            self.queue.put((chat, kind, media_id))
+            self.render(chat, state, "✅ Загрузка добавлена в очередь.",
+                        [("📥 Скачать ещё", "download", None), ("📂 Файлы", "files", None)])
+        elif action == "root":
+            attribute = {"music": "folder_music", "book": "folder_audiobooks", "podcast": "folder_podcasts"}[payload]
+            root = getattr(self.api, attribute)
+            if not root:
+                raise ValueError("Каталог не настроен")
+            state.root = state.directory = Path(root).absolute()
+            state.file_page = 0
+            self.files_page(chat, state)
+        elif action == "file_page":
+            state.file_page = payload
+            self.files_page(chat, state)
+        elif action == "up":
+            if state.directory != state.root:
+                state.directory = state.directory.parent
+            state.file_page = 0
+            self.files_page(chat, state)
+        elif action == "file":
+            path = state.files[payload]
+            # Re-list securely: paths may have disappeared or become links since rendering.
+            current = dict(list_media(state.root, state.directory))
+            if path not in current:
+                raise ValueError("Файл больше недоступен")
+            if current[path]:
+                state.directory, state.file_page = path, 0
+            else:
+                with open_media(state.root, path) as source:
+                    self.bot.send_document(chat, source, visible_file_name=path.name)
+            self.files_page(chat, state)
+        elif action == "archive":
+            with TemporaryDirectory(prefix="tbot-") as temp:
+                archive = Path(temp) / "media.zip"
+                archive_media(state.root, state.directory, archive)
+                with archive.open("rb") as source:
+                    self.bot.send_document(chat, source, visible_file_name="media.zip")
+            self.files_page(chat, state)
 
 
-if __name__ == '__main__':
-    download_monitor_thread = threading.Thread(target=download_monitor)
-    download_monitor_thread.start() # запуск потока скачивания медиафайлов
-    bot_thread = threading.Thread(target=bot.infinity_polling, kwargs={'skip_pending':True})
-    bot_thread.start() # запуск бота в отдельном потоке
-    echo_status_thread = threading.Thread(target=echo_status, kwargs={
-        'downloader_status': download_monitor_thread,
-        'bot_status': bot_thread})
-    echo_status_thread.start()
-    
+def create_bot(api, token, allowed_id, *, bot=None, start_worker=True):
+    """Inject a bot double and disable worker startup for deterministic offline tests."""
+    allowed_id = validate_allowed_id(allowed_id)
+    if bot is None:
+        import telebot
+        bot = telebot.TeleBot(token, threaded=False)
+    frontend = Frontend(api, bot, allowed_id)
+    bot.frontend = frontend
+    bot.message_handler(func=lambda message: True, content_types=[
+        "text", "audio", "document", "photo", "sticker", "video", "voice", "contact", "location"
+    ])(frontend.message)
+    bot.callback_query_handler(func=lambda call: True)(frontend.callback)
+    if start_worker:
+        frontend.start_worker()
+    return bot
+
+
+def main():
+    from dotenv import load_dotenv
+    load_dotenv()
+    try:
+        allowed_id = validate_allowed_id(os.getenv("TELEGRAM_ALLOWED_USER_ID"))
+    except ValueError as error:
+        raise SystemExit(str(error)) from None
+    token = os.getenv("TELEGRAMM_TOKEN")
+    if not token:
+        raise SystemExit("Не задан TELEGRAMM_TOKEN — токен Telegram-бота.")
+    import API
+    from telebot import apihelper
+    proxy = os.getenv("TELEGRAM_PROXY_URL")
+    apihelper.proxy = {"https": proxy} if proxy else None
+    logging.basicConfig(level=logging.INFO)
+    bot = create_bot(API, token, allowed_id)
+    bot.infinity_polling(skip_pending=True)
+
+
+if __name__ == "__main__":
+    main()

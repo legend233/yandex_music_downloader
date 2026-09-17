@@ -30,29 +30,85 @@ logger.add(f"{folder_music}/log.log",
            )
 
 
+def search_artists(query, page=0):
+    """Возвращаем страницу найденных артистов для выбора по ID."""
+    result = client.search(query, type_="artist", page=page, nocorrect=False)
+    if result is None or result.artists is None:
+        return []
+    return [{'id': artist.id, 'name': artist.name}
+            for artist in (result.artists.results or [])]
+
+
+def get_artist_info(artist_id):
+    """Получаем информацию об артисте непосредственно по ID."""
+    brief = client.artists_brief_info(artist_id=artist_id)
+    if brief is None or brief.artist is None:
+        return f'Артист с ID {artist_id} не найден.'
+    artist = brief.artist
+    text = f'Артист: {artist.name}\nID: {artist.id}'
+    if artist.counts is not None:
+        text += f'\nПрямых альбомов: {artist.counts.direct_albums}'
+    return text
+
+
+def download_artist(artist_id):
+    """Скачиваем уникальные прямые альбомы артиста со всех страниц."""
+    downloaded = 0
+    failed = 0
+    seen = set()
+    page = 0
+    try:
+        brief = client.artists_brief_info(artist_id=artist_id)
+        if brief is None or brief.artist is None:
+            return f'Артист с ID {artist_id} не найден.'
+        artist_name = brief.artist.name
+        logger.info(f'Start download: Artist ID: {artist_id} / Artist name: {artist_name}')
+        while True:
+            albums = client.artists_direct_albums(artist_id=artist_id, page=page, page_size=100)
+            if albums is None:
+                raise RuntimeError('Не получена страница прямых альбомов')
+            if not albums.albums:
+                break
+            for album in albums.albums:
+                # API может возвращать один ID как число или строку.
+                album_id = str(album.id)
+                if album_id in seen:
+                    continue
+                seen.add(album_id)
+                try:
+                    result = download_album(album.id)
+                except Exception as error:
+                    logger.error(f'Album ID: {album.id} / {error}')
+                    result = None
+                # logger.catch у download_album подавляет исключения и возвращает None.
+                if result is None:
+                    failed += 1
+                else:
+                    downloaded += 1
+            page += 1
+    except Exception as error:
+        logger.error(f'Artist ID: {artist_id} / {error}')
+        return (f'Загрузка артиста с ID {artist_id} не завершена. '
+                f'Скачано альбомов: {downloaded}; ошибок альбомов: {failed}.')
+
+    if failed:
+        return (f'Загрузка артиста {artist_name} завершена с ошибками. '
+                f'Скачано альбомов: {downloaded}; не удалось скачать: {failed}.')
+    if not seen:
+        return f'У артиста {artist_name} нет прямых альбомов.'
+    return f'Успешно скачал артиста: {artist_name} с его {downloaded} альбомами.'
+
+
 @logger.catch
 def search_and_download_artist(search: str):
-    """Ищем лучший результат по запросу артиста и скачиваем все его песни в папку download с разбивкой по альбомам"""
-
+    """Совместимая обёртка: скачиваем первого найденного артиста по его ID."""
     try:
-        search_result = client.search(search, type_="artist", page=0, nocorrect=False)  # поиск
-        artist_id = search_result['artists']['results'][0]['id']
-        artist_name = search_result['artists']['results'][0]['name']
+        artists = search_artists(search)
     except Exception:
-        print('No results! You sure?')
         return f'Твой запрос: {search} не найден.'
-
-    direct_albums_count = search_result['artists']['results'][0]['counts']['direct_albums']
-    artist_echo = f"Start download: Artist ID: {artist_id} / Artist name: {artist_name} / Direct albums: {direct_albums_count}"  # вывод информации о артисте информации по артисту
-    logger.info(artist_echo)  # вывод в лог
-    # находим список альбомов артиста с информацией
-    direct_albums = client.artistsDirectAlbums(artist_id=artist_id, page_size=1000)
-    # проходимся по каждому альбому
-    for album in direct_albums:
-        # проходимся по каждому диску в альбоме и загружаем его в папку
-        download_album(album['id'])
-
-    return f"Успешно скачал артиста: {artist_name} с его {direct_albums_count} альбомами."
+    if not artists:
+        return f'Твой запрос: {search} не найден.'
+    return download_artist(artists[0]['id'])
 
 
 @logger.catch

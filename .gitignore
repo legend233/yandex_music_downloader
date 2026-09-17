@@ -6,5 +6,9 @@
 /.idea
 test.py
 test2.py
-/__pycache__/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+/test-results/
 .DS_Store
+.venv
