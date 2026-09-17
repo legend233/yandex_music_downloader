@@ -3,6 +3,12 @@ stages:
   - build
   - deploy
 
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      when: never
+    - when: always
+
 default:
   image: python:3.11
   tags:
@@ -37,11 +43,16 @@ python-tests:
   stage: tests
   image: python:3.11
   script:
-    - echo "Running tests"
-  rules:
-    - !reference [.feature-rules, rules]
-    - if: $CI_PIPELINE_SOURCE != "merge_request_event"
-      when: always
+    - pip install -r requirements.txt pytest
+    - mkdir -p test-results
+    - python -m pytest tests/ --junitxml=test-results/junit.xml
+  artifacts:
+    when: always
+    expire_in: 2 weeks
+    reports:
+      junit: test-results/junit.xml
+    paths:
+      - test-results/junit.xml
 
 
 build-push-feature:
@@ -72,3 +83,21 @@ build-push-tag:
   rules:
     - if: $CI_COMMIT_TAG
       when: manual
+
+
+deploy-main:
+  stage: deploy
+  image: python:3.11-alpine
+  needs:
+    - python-tests
+    - build-push-master
+  resource_group: portainer-yandexdownloader
+  variables:
+    PORTAINER_ENDPOINT_NAME: pve-2-docker
+    PORTAINER_STACK_NAME: yandexdownloader
+  environment:
+    name: production
+  script:
+    - python scripts/deploy.py
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"

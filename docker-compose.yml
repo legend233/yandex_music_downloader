@@ -2,6 +2,7 @@ version: '2.2'
 services:
   yandex_downloader:
     image: yuchoba/ya-download:amd64
+    build: .
     container_name: yandex_downloader
     restart: unless-stopped
     volumes:
@@ -10,6 +11,7 @@ services:
       - YOUR_DOWNLOAD_PATH_PODCASTS:/podcasts
     environment:
       - TELEGRAMM_TOKEN=YOUR_TELEGRAMM_TOKEN
+      - TELEGRAM_ALLOWED_USER_ID=${TELEGRAM_ALLOWED_USER_ID:?Set your Telegram user ID in .env}
       - YA_TOKEN=YOUR_YA_TOKEN
       - YA_PROXY_URL=YOUR_YA_PROXY_URL
       - TELEGRAM_PROXY_URL=YOUR_TELEGRAM_PROXY_URL
